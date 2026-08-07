@@ -1,4 +1,4 @@
-from runtime.failure_reason import FailureReason
+from enums.failure_reason import FailureReason
 
 
 def test_failure_reason_values():

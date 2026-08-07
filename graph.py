@@ -1,9 +1,7 @@
 from langgraph.graph import StateGraph, START, END
 
 from state import AgentState
-print(AgentState)
-print(AgentState.__annotations__)
-print("AgentState:", AgentState.__annotations__)
+
 from nodes import (
     agent_node,
     planner_node,
@@ -18,23 +16,12 @@ workflow = StateGraph(AgentState)
 
 # Add Nodes
 workflow.add_node("agent", agent_node)
-
 workflow.add_node("planner", planner_node)
-
 workflow.add_node("executor", executor_node)
-workflow.add_node("synthesizer", synthesizer_node)
-workflow.add_node("replanner",replanner_node)
 workflow.add_node("completion",completion_node)
-workflow.add_node(
-    "error_handler",
-    error_handler_node
-)
-def choose_after_replan(state):
-
-    if state["done"]:
-        return "synthesizer"
-
-    return "executor"
+workflow.add_node("replanner",replanner_node)
+workflow.add_node("synthesizer", synthesizer_node)
+workflow.add_node("error_handler",error_handler_node)
 
 def choose_next(state):
 
@@ -43,9 +30,8 @@ def choose_next(state):
 
     return "continue"
 
-def choose_after_planner(state):
+def route_after_planner(state):
 
-    print("\n===== ROUTER STATE =====")
     print(state)
 
     if state.get("error"):
@@ -54,7 +40,7 @@ def choose_after_planner(state):
     return "executor"
 
 
-def choose_after_replanner(state):
+def route_after_replanner(state):
 
     if state.get("error"):
         return "error"
@@ -64,7 +50,7 @@ def choose_after_replanner(state):
 
     return "executor"
 
-def choose_after_synthesizer(state):
+def route_after_synthesizer(state):
 
     if state.get("error"):
         return "error"
@@ -79,7 +65,7 @@ workflow.add_edge("agent", "planner")
 # Routing
 workflow.add_conditional_edges(
     "planner",
-    choose_after_planner,
+    route_after_planner,
     {
         "executor": "executor",
         "error": "error_handler"
@@ -88,7 +74,7 @@ workflow.add_conditional_edges(
 # RAG Path
 workflow.add_edge(
     "executor",
-    "replanner"
+    "completion"
 )
 workflow.add_conditional_edges(
     "completion",
@@ -100,7 +86,7 @@ workflow.add_conditional_edges(
 )
 workflow.add_conditional_edges(
     "replanner",
-    choose_after_replanner,
+     route_after_replanner,
     {
         "executor": "executor",
         "synthesizer": "synthesizer",
@@ -110,7 +96,7 @@ workflow.add_conditional_edges(
 
 workflow.add_conditional_edges(
     "synthesizer",
-    choose_after_synthesizer,
+     route_after_synthesizer,
     {
         "done": END,
         "error": "error_handler",

@@ -1,6 +1,6 @@
 from runtime.event import WorkflowEvent
 from runtime.event_bus import EventBus
-from runtime.event_types import WorkflowEventType
+from shared_types.workflow_event_type import WorkflowEventType
 
 
 def test_listener_receives_event():

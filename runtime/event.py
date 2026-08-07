@@ -2,7 +2,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-from runtime.event_types import WorkflowEventType
+from shared_types.workflow_event_type import WorkflowEventType
 
 
 @dataclass

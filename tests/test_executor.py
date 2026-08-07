@@ -22,11 +22,12 @@ from executor import (
     execute_step,
     executor_node,
 )
-from step_status import StepStatus
 
+from shared_types.step_status import StepStatus
 from runtime.event_bus import EventBus
-from runtime.event_types import WorkflowEventType
-from runtime.failure_reason import FailureReason
+from shared_types.workflow_event_type import WorkflowEventType
+
+from shared_types.failure_reason import FailureReason
 
 from runtime.runtime_config import RuntimeConfig
 from runtime.approval_request import ApprovalRequest

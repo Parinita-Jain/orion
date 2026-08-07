@@ -15,16 +15,16 @@ from config import logger
 from runtime.retry import execute_with_retry
 
 from execution_summary import ExecutionSummary
-from step_status import StepStatus
+from shared_types.step_status import StepStatus
 
 from runtime.event import WorkflowEvent
 from runtime.event_bus import EventBus
-from runtime.event_types import WorkflowEventType
+from shared_types.workflow_event_type import WorkflowEventType
 
 from runtime.timeout import run_with_timeout
 from concurrent.futures import TimeoutError
 
-from runtime.failure_reason import FailureReason
+from shared_types.failure_reason import FailureReason
 from runtime.retry_error import RetryError
 
 from runtime.approval_decision import ApprovalDecision

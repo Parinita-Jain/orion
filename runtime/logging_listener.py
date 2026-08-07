@@ -1,8 +1,9 @@
 import logging
 
 from runtime.event import WorkflowEvent
-from runtime.event_types import WorkflowEventType
-from runtime.failure_reason import FailureReason
+
+from shared_types.workflow_event_type import WorkflowEventType
+from shared_types.failure_reason import FailureReason
 
 logger = logging.getLogger(__name__)
 

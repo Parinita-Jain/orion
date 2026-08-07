@@ -9,8 +9,8 @@ from planner import planner_node
 from executor import executor_node
 from registry import register_tool, clear_registry
 from schemas import PlannerOutput, PlanStep
-from step_status import StepStatus
 
+from shared_types.step_status import StepStatus
 from runtime.runtime_config import RuntimeConfig
 
 
