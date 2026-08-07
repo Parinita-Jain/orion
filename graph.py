@@ -11,6 +11,9 @@ from completion import completion_node
 from replanner import replanner_node
 from synthesizer import synthesizer_node
 from error_handler import error_handler_node
+
+from shared_types.completion_status import CompletionStatus
+
 # Create Graph
 workflow = StateGraph(AgentState)
 
@@ -23,12 +26,20 @@ workflow.add_node("replanner",replanner_node)
 workflow.add_node("synthesizer", synthesizer_node)
 workflow.add_node("error_handler",error_handler_node)
 
-def choose_next(state):
+def route_after_completion(state):
 
-    if state["done"]:
-        return "done"
+    status = state["completion_status"]
 
-    return "continue"
+    if status == CompletionStatus.COMPLETE:
+        return "synthesizer"
+
+    if status == CompletionStatus.CONTINUE:
+        return "executor"
+
+    if status == CompletionStatus.REPLAN:
+        return "replanner"
+
+    return "error_handler"
 
 def route_after_planner(state):
 
@@ -78,11 +89,13 @@ workflow.add_edge(
 )
 workflow.add_conditional_edges(
     "completion",
-    choose_next,
+    route_after_completion,
     {
-        "done": "synthesizer",
-        "continue": "replanner"
-    }
+        "synthesizer": "synthesizer",
+        "executor": "executor",
+        "replanner": "replanner",
+        "error": "error_handler",
+    },
 )
 workflow.add_conditional_edges(
     "replanner",

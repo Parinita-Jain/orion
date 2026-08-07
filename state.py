@@ -10,6 +10,8 @@ from errors import OrionError
 from execution import ExecutionRecord
 from config import logger
 
+from shared_types.completion_status import CompletionStatus
+
 class AgentState(TypedDict):
 
     messages: Annotated[

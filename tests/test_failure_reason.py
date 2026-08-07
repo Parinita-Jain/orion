@@ -1,4 +1,4 @@
-from enums.failure_reason import FailureReason
+from shared_types.failure_reason import FailureReason
 
 
 def test_failure_reason_values():
