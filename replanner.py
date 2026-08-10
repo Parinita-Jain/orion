@@ -2,12 +2,19 @@ from schemas import ReplannerOutput
 from shared import llm
 from registry import get_tool_descriptions
 from errors import OrionError, ErrorType
+from config.settings import MAX_REPLANS
+
+from shared_types.failure_classifier import (
+    is_recoverable_failure,
+)
+
+from shared_types.step_status import StepStatus
 
 def replanner_node(state):
 
     print("\n===== REPLANNER NODE =====")
 
-    MAX_REPLANS = 3
+    
 
     iteration = state.get("iteration", 0)
 
@@ -26,29 +33,66 @@ def replanner_node(state):
 
     question = state["messages"][-1].content
 
-    results = ""
+    completed_steps = ""
+
+    failed_steps = ""
+
+    pending_steps = ""
 
     for step in state["steps"]:
 
-        tool_result = state["tool_results"][step.id]
+        tool_result = state["tool_results"].get(step.id)
 
-        results += f"""
-        Step {step.id}
+        if tool_result is None:
 
-        Tool:
-        {step.tool}
+            pending_steps += f"""
+    Step {step.id}
 
-        Success:
-        {tool_result["success"]}
+    Tool:
+    {step.tool}
 
-        Output:
-        {tool_result["output"]}
+    -------------------------
+    """
 
-        Error:
-        {tool_result["error"]}
+            continue
 
-        -------------------------
-        """
+        if tool_result["status"] == StepStatus.SUCCESS:
+
+            completed_steps += f"""
+    Step {step.id}
+
+    Tool:
+    {step.tool}
+
+    Output:
+    {tool_result["output"]}
+
+    -------------------------
+    """
+
+            continue
+
+        recoverable = is_recoverable_failure(
+            tool_result.get("failure_reason")
+        )
+
+        failed_steps += f"""
+    Step {step.id}
+
+    Tool:
+    {step.tool}
+
+    Error:
+    {tool_result["error"]}
+
+    Failure Reason:
+    {tool_result.get("failure_reason")}
+
+    Recoverable:
+    {recoverable}
+
+    -------------------------
+    """
     tool_descriptions = get_tool_descriptions()
     prompt = f"""
     You are an AI Replanner.
@@ -59,9 +103,19 @@ def replanner_node(state):
 
     {question}
 
-    Completed Steps:
+    Workflow Status
 
-    {results}
+    Completed Steps
+
+    {completed_steps}
+
+    Failed Steps
+
+    {failed_steps}
+
+    Pending Steps
+
+    {pending_steps}
 
     Available tools:
 
@@ -131,7 +185,13 @@ def replanner_node(state):
 
     9. Never create a tool that is not registered.
 
-    10. Do not repeat failed steps unless the failure is marked recoverable.
+    10. Do not recreate completed steps.
+
+        Retry failed steps only if they are marked as recoverable.
+
+        Do not retry non-recoverable failures.
+
+        Pending steps may be reused if they are still required.
     """
     structured_llm = llm.with_structured_output(
         ReplannerOutput
