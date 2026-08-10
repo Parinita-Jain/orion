@@ -33,5 +33,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run test suite
+        env:
+           GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
         run: |
           pytest
