@@ -1,39 +1,59 @@
-# Orion - LangGraph Agent Framework
+# Orion — AI Workflow Orchestration Framework
 
-Orion is a modular Agentic AI framework built with LangGraph. It combines planning, tool execution, replanning, and synthesis to solve multi-step tasks using specialized tools such as RAG, LLM reasoning, and calculators.
+**Orion** is a modular AI workflow orchestration framework built on **LangGraph**.
+
+It enables intelligent task planning, multi-tool execution, dynamic replanning, workflow branching, validation, and final response synthesis using Large Language Models (LLMs) and external tools.
+
+Orion is designed as an extensible orchestration engine rather than a single AI agent.
 
 ---
 
-## Features
+# Features
 
-### Agent Framework
-- Multi-step planning using Gemini
-- Tool registry
-- Planner → Executor → Replanner → Synthesizer workflow
-- Conditional graph execution
-- Centralized AgentState
-- Execution tracking
-- Structured planning using Pydantic
+## Workflow Engine
 
-### Tooling
-- Calculator Tool
-- RAG Tool
-- General LLM Tool
-- Direct Conversation Tool
+- Multi-step planning
+- Dynamic replanning
+- Conditional workflow branching
+- Dependency-aware execution
+- Completion state evaluation
+- Centralized workflow state
+- Human approval support
+- Structured execution records
 
-### RAG
-- PDF ingestion
-- ChromaDB vector database
-- HuggingFace Embeddings
-- Semantic retrieval
+---
+
+## Built-in Tools
+
+- Calculator
 - Retrieval-Augmented Generation (RAG)
+- General LLM reasoning
+- Direct conversation
 
-### Reliability
-- Centralized error model (`OrionError`)
-- Error handler node
+The tool registry makes it easy to add new tools without modifying the planner.
+
+---
+
+## RAG Support
+
+- PDF ingestion
+- ChromaDB vector store
+- HuggingFace embeddings
+- Semantic retrieval
+- Retrieval-Augmented Generation
+
+---
+
+## Reliability
+
+- Centralized error model
 - Plan validation
-- Dependency resolution between steps
-- Execution records
+- Dependency validation
+- Recoverable vs non-recoverable failures
+- Dynamic replanning
+- Execution history
+- Structured logging
+- 95+ automated tests
 
 ---
 
@@ -48,57 +68,101 @@ Orion is a modular Agentic AI framework built with LangGraph. It combines planni
                       ▼
                  Planner Node
                       │
-          ┌───────────┴───────────┐
-          │                       │
-          ▼                       ▼
-     Error Handler           Executor
-                                  │
-                                  ▼
-                            Replanner
-                     ┌────────┴────────┐
-                     │                 │
-                     ▼                 ▼
-                Executor         Synthesizer
-                                       │
-                                       ▼
-                                      END
+            ┌─────────┴─────────┐
+            │                   │
+            ▼                   ▼
+      Error Handler        Executor
+                                 │
+                                 ▼
+                         Completion Node
+                                 │
+          ┌──────────────┬───────────────┬──────────────┐
+          │              │               │              │
+          ▼              ▼               ▼              ▼
+     Executor       Replanner     Synthesizer    Error Handler
+                                            │
+                                            ▼
+                                           END
 ```
 
 ---
 
-## Directory Structure
+# Project Structure
 
 ```
-langgraph-rag-agent/
+orion/
 
 ├── app.py
 ├── graph.py
 ├── state.py
-├── registry.py
-├── errors.py
-├── error_handler.py
-│
 ├── planner.py
 ├── executor.py
+├── completion.py
 ├── replanner.py
 ├── synthesizer.py
-├── agent.py
+├── error_handler.py
 │
+├── config/
+├── docs/
+├── runtime/
+├── shared_types/
 ├── tools/
-│   ├── calculator.py
-│   ├── rag.py
-│   ├── llm.py
-│   └── direct.py
+├── tests/
 │
-├── data/
-├── ingest.py
-├── README.md
-└── requirements.txt
+├── registry.py
+├── validator.py
+├── schemas.py
+├── requirements.txt
+└── README.md
 ```
 
 ---
 
-# Tech Stack
+# Workflow
+
+```
+User Request
+      │
+      ▼
+ Planner
+      │
+      ▼
+ Executor
+      │
+      ▼
+ Completion
+      │
+ ┌────┼───────────────┬───────────────┐
+ │    │               │               │
+ ▼    ▼               ▼               ▼
+CONTINUE          REPLAN          COMPLETE      FAILED
+ │                 │                 │            │
+ ▼                 ▼                 ▼            ▼
+Executor      Replanner      Synthesizer   Error Handler
+```
+
+---
+
+# Current Capabilities
+
+- Multi-step planning
+- Dynamic replanning
+- Conditional execution
+- Workflow branching
+- Tool registry
+- Dependency resolution
+- Completion state evaluation
+- Human approval
+- Execution tracking
+- Centralized state management
+- Structured error handling
+- RAG
+- Calculator
+- General LLM reasoning
+
+---
+
+# Technology Stack
 
 - Python
 - LangGraph
@@ -107,79 +171,79 @@ langgraph-rag-agent/
 - ChromaDB
 - HuggingFace Embeddings
 - Pydantic
+- Pytest
 
 ---
 
-# Current Workflow
+# Documentation
 
-1. User asks a question.
-2. Planner decomposes it into executable steps.
-3. Executor runs available tools.
-4. Replanner checks if additional work is required.
-5. Executor continues until complete.
-6. Synthesizer generates the final response.
-7. Error Handler manages failures gracefully.
+See the **docs/** folder for detailed architecture documentation.
+
+- planner.md
+- executor.md
+- completion.md
+- replanner.md
+- validator.md
+- graph.md
+- state.md
+
+Architecture Decision Records are available in:
+
+```
+docs/adr/
+```
+
+Sprint documentation is available in:
+
+```
+docs/sprints/
+```
 
 ---
 
-# Current Capabilities
+# Testing
 
-✅ Multi-tool planning
+Run the complete test suite:
 
-✅ Dependency resolution
+```bash
+pytest
+```
 
-✅ RAG
+Current status:
 
-✅ Calculator
-
-✅ General LLM reasoning
-
-✅ Replanning
-
-✅ Centralized state management
-
-✅ Execution records
-
-✅ Conditional routing
-
-✅ Error handling
+```
+95 tests passing
+```
 
 ---
 
 # Roadmap
 
-## Sprint 1 ✅
-- Basic LangGraph RAG agent
+## Completed
 
-## Sprint 2.0A ✅
-- Planner
-- Executor
-- Replanner
-- Synthesizer
-- Tool Registry
-- AgentState
-- Error Handling
+- Multi-step planning
+- Tool registry
+- Validation
+- Workflow branching
+- Human approval
+- Completion state evaluation
+- Dynamic replanning
+- Structured error handling
 
-## Sprint 2.0B 🚧
-- Logging
-- Retry improvements
-- Production-grade exception handling
-- Synthesizer optimization
+## Planned
 
-## Sprint 2.1
+- Step supersession for failed workflow steps
 - Parallel execution
-
-## Sprint 2.2
-- Memory
-
-## Sprint 2.3
+- Persistent workflow execution
+- Workflow visualization
+- Multi-agent collaboration
 - FastAPI deployment
-- Streaming responses
-- Docker
+- Streaming execution
+- Docker support
 
 ---
 
-# Run
+# Running Orion
 
 ```bash
 pip install -r requirements.txt

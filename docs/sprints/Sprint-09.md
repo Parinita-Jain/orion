@@ -1,24 +1,26 @@
-# Sprint 9 – Dynamic Replanning
+# Sprint 9
 
 ## Goal
 
-Enable Orion to recover from recoverable failures by generating additional execution steps.
+Introduce dynamic replanning support.
 
-## Architectural Decisions
+## Completed
 
-- Introduced CompletionStatus enum.
-- Completion node becomes the workflow orchestrator.
-- Recoverable failures pause execution immediately.
-- Replanner only generates additional steps.
+- CompletionStatus state machine
+- Completion node redesign
+- Shared workflow types
+- Failure classification
+- Graph routing using CompletionStatus
+- Replanner workflow context improvements
+- Replanner unit tests
+- Integration test for replanning workflow
 
-## Tests Added
+## Known Limitation
 
-...
+The replanner currently appends new steps to the existing plan.
 
-## Files Changed
+Failed steps remain part of the execution history.
 
-...
+Therefore, Completion continues to detect recoverable failures and requests replanning again.
 
-## Lessons Learned
-
-...
+This limitation will be addressed in Sprint 10 by introducing step replacement/supersession.

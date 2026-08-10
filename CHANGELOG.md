@@ -1,48 +1,24 @@
-# Orion Changelog
-
-## v1.0.0 (In Development)
-
-### Sprint 1
-- Created models package.
-- Added Plan model.
-- Added PlanStep model.
-- Added ToolResult model.
-- Added ExecutionRecord model.
-- Added AgentState model.
-
-Status:
-- No functional changes.
-- Framework behaviour unchanged.
-
 # Changelog
 
-All notable changes to Orion will be documented in this file.
-
----
-
-## Sprint 2.0A (2026-07-23)
+## v0.9.0
 
 ### Added
-- Planner node
-- Executor node
-- Replanner node
-- Synthesizer node
-- Centralized AgentState
-- Tool registry
-- OrionError
-- Error handler
-- Execution records
-- Plan validation
-- Dependency resolution
 
-### Changed
-- Removed duplicate AgentState definition
-- Refactored graph routing
-- Improved project structure
+- CompletionStatus
+- Completion Node
+- Dynamic Replanning
+- Shared workflow types
+- Failure classification
+- Integration tests
+- Architecture documentation
 
-### Fixed
-- Planner error propagation
-- Centralized error handling
+### Improved
 
-----
+- Graph routing
+- Replanner context
+- Documentation
 
+### Known Limitation
+
+- Replanned steps are appended rather than replacing failed steps.
+- Step supersession will be introduced in Sprint 10.
