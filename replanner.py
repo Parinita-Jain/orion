@@ -35,7 +35,9 @@ def replanner_node(state):
 
     completed_steps = ""
 
-    failed_steps = ""
+    recoverable_failed_steps = ""
+
+    nonrecoverable_failed_steps = ""
 
     pending_steps = ""
 
@@ -109,9 +111,13 @@ def replanner_node(state):
 
     {completed_steps}
 
-    Failed Steps
+    Recoverable Failed Steps
 
-    {failed_steps}
+    {recoverable_failed_steps}
+
+    Non-Recoverable Failed Steps
+
+    {nonrecoverable_failed_steps}
 
     Pending Steps
 
