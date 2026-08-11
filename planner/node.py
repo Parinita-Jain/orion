@@ -1,7 +1,7 @@
 import re
 
 
-from validator import validate_plan
+from validation import validate_plan
 from registry import (list_tools,
                       get_tool_descriptions,)
 from errors import OrionError, ErrorType

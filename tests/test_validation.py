@@ -1,9 +1,9 @@
 import pytest
 
 from schemas import PlanStep, ApprovalConfig
-from validator import validate_plan
+
 from registry import Tool, clear_registry, register_tool
-from validator import validate_plan
+from validation import validate_plan
 
 
 def dummy_tool(state):
@@ -172,7 +172,7 @@ def test_non_sequential_step_ids():
     assert "Expected step id 2, found 3" in errors
 
 from schemas import PlanStep, ApprovalConfig
-from validator import validate_plan
+from validation import validate_plan
 
 
 def test_validate_plan_requires_approval_reason():
