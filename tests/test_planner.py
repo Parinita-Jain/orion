@@ -79,7 +79,7 @@ def test_non_greeting_goes_to_llm():
             raise RuntimeError("LLM called")
 
     with patch(
-        "planner.get_structured_llm",
+        "planner.node.get_structured_llm",
         return_value=FakeStructuredLLM(),
     ):
 
@@ -117,7 +117,7 @@ def test_valid_llm_plan():
             return planner_output
 
     with patch(
-        "planner.get_structured_llm",
+        "planner.node.get_structured_llm",
         return_value=FakeStructuredLLM(),
     ):
 
@@ -165,11 +165,11 @@ def test_planner_repairs_invalid_plan():
 
     with (
         patch(
-            "planner.get_structured_llm",
+            "planner.node.get_structured_llm",
             return_value=FakeStructuredLLM(),
         ),
         patch(
-            "planner.repair_plan",
+            "planner.node.repair_plan",
             return_value=repaired_plan,
         ) as mock_repair,
     ):
@@ -214,11 +214,11 @@ def test_planner_repair_failure():
 
     with (
         patch(
-            "planner.get_structured_llm",
+            "planner.node.get_structured_llm",
             return_value=FakeStructuredLLM(),
         ),
         patch(
-            "planner.repair_plan",
+            "planner.node.repair_plan",
             return_value=invalid_plan,
         ) as mock_repair,
     ):
@@ -261,7 +261,7 @@ def test_valid_multistep_llm_plan():
             return planner_output
 
     with patch(
-        "planner.get_structured_llm",
+        "planner.node.get_structured_llm",
         return_value=FakeStructuredLLM(),
     ):
 
@@ -287,7 +287,7 @@ def test_valid_multistep_llm_plan():
 
     assert result["error"] is None
 
-@patch("planner.get_structured_llm")
+@patch("planner.node.get_structured_llm")
 def test_planner_creates_approval_request(mock_llm):
 
     class FakeLLMApproval:
@@ -336,7 +336,7 @@ def test_planner_creates_approval_request(mock_llm):
         == "Planner requested approval."
     )
 
-@patch("planner.get_structured_llm")
+@patch("planner.node.get_structured_llm")
 def test_planner_without_approval(mock_llm):
 
     class FakeLLM:
@@ -369,7 +369,7 @@ def test_planner_without_approval(mock_llm):
 
     assert step.approval is None
 
-@patch("planner.get_structured_llm")
+@patch("planner.node.get_structured_llm")
 def test_planner_supports_branching(mock_llm):
 
     class FakeLLM:
@@ -426,7 +426,7 @@ def test_planner_supports_branching(mock_llm):
         == "#1.answer != 'yes'"
     )
 
-@patch("planner.get_structured_llm")
+@patch("planner.node.get_structured_llm")
 def test_planner_generates_mutually_exclusive_branches(mock_llm):
 
     class FakeLLM:

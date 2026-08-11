@@ -197,7 +197,7 @@ def setup_registry():
 
     clear_registry()
 
-@patch("planner.get_structured_llm")
+@patch("planner.node.get_structured_llm")
 def test_planner_executor_integration(mock_llm):
 
     mock_llm.return_value = FakeLLMSingleStep()
@@ -223,7 +223,7 @@ def test_planner_executor_integration(mock_llm):
 
     assert len(result["execution_records"]) == 1
 
-@patch("planner.get_structured_llm")
+@patch("planner.node.get_structured_llm")
 def test_sequential_workflow_integration(mock_llm):
 
     mock_llm.return_value = FakeLLMMultiStep()
@@ -271,7 +271,7 @@ def test_sequential_workflow_integration(mock_llm):
     # Two execution records
     assert len(result["execution_records"]) == 2
 
-@patch("planner.get_structured_llm")
+@patch("planner.node.get_structured_llm")
 def test_parallel_workflow_integration(mock_llm):
 
     mock_llm.return_value = FakeLLMParallel()
@@ -318,7 +318,7 @@ def test_parallel_workflow_integration(mock_llm):
 
     assert len(result["execution_records"]) == 3
 
-@patch("planner.get_structured_llm")
+@patch("planner.node.get_structured_llm")
 def test_failure_propagation(mock_llm):
 
     mock_llm.return_value = FakeLLMFailure()
@@ -359,7 +359,7 @@ def test_failure_propagation(mock_llm):
     assert "step_2" not in result["context"]
     assert "step_3" not in result["context"]
 
-@patch("planner.get_structured_llm")
+@patch("planner.node.get_structured_llm")
 def test_resume_execution(mock_llm):
 
     mock_llm.return_value = FakeLLMMultiStep()
@@ -413,7 +413,7 @@ def test_resume_execution(mock_llm):
     # Only Step 2 should have executed during resume
     assert len(result["execution_records"]) == 1
 
-@patch("planner.get_structured_llm")
+@patch("planner.node.get_structured_llm")
 def test_resume_after_partial_progress(mock_llm):
 
     mock_llm.return_value = FakeLLMMultiStep()
