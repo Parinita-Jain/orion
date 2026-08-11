@@ -623,6 +623,26 @@ def executor_node(state):
                 
                     completed_steps.add(step.id)
 
+                    # -----------------------------
+                    # Sprint 10 - Step Supersession
+                    # -----------------------------
+                    if (
+                        step.replaces_step_id is not None
+                        and step.replaces_step_id in tool_results
+                    ):
+
+                        original = tool_results[
+                            step.replaces_step_id
+                        ]
+
+                        original["status"] = StepStatus.SUPERSEDED
+
+                        logger.info(
+                            "Step %d superseded by step %d",
+                            step.replaces_step_id,
+                            step.id,
+                        )
+
                 if step in pending_steps:
                     pending_steps.remove(step)
 

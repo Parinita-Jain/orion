@@ -27,6 +27,7 @@ def test_dynamic_replanning_workflow(mock_llm):
                         tool="llm",
                         tool_input="Summarize the final answer",
                         depends_on=[1],
+                        replaces_step_id=2,
                     )
                 ],
             )
@@ -117,31 +118,7 @@ def test_dynamic_replanning_workflow(mock_llm):
     #
     # This behavior is documented in ADR-007.
 
-    # ---------------------------------
-    # Execute replanned step
-    # ---------------------------------
-
-    """
-
-    state["steps"] = replanner_result["steps"]
-
-    state["tool_results"][3] = {
-        "success": True,
-        "status": StepStatus.SUCCESS,
-        "output": "Summary",
-        "error": None,
-        "failure_reason": None,
-    }
-
-
-    result = completion_node(state)
-
-    assert (
-        result["completion_status"]
-        == CompletionStatus.COMPLETE
-    )
-
-    """
+    
 
 
         

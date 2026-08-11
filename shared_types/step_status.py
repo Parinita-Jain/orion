@@ -6,3 +6,4 @@ class StepStatus(str, Enum):
     FAILED = "failed"
     SKIPPED = "skipped"
     WAITING_FOR_APPROVAL = "waiting_for_approval"
+    SUPERSEDED = "superseded"

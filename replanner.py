@@ -78,23 +78,25 @@ def replanner_node(state):
             tool_result.get("failure_reason")
         )
 
-        failed_steps += f"""
-    Step {step.id}
+        entry = f"""
+        Step {step.id}
 
-    Tool:
-    {step.tool}
+        Tool:
+        {step.tool}
 
-    Error:
-    {tool_result["error"]}
+        Error:
+        {tool_result["error"]}
 
-    Failure Reason:
-    {tool_result.get("failure_reason")}
+        Failure Reason:
+        {tool_result.get("failure_reason")}
 
-    Recoverable:
-    {recoverable}
+        -------------------------
+        """
 
-    -------------------------
-    """
+        if recoverable:
+            recoverable_failed_steps += entry
+        else:
+            nonrecoverable_failed_steps += entry
     tool_descriptions = get_tool_descriptions()
     prompt = f"""
     You are an AI Replanner.
@@ -191,13 +193,45 @@ def replanner_node(state):
 
     9. Never create a tool that is not registered.
 
-    10. Do not recreate completed steps.
+    10. Never recreate completed steps.
 
-        Retry failed steps only if they are marked as recoverable.
+    11. Retry only recoverable failed steps.
 
-        Do not retry non-recoverable failures.
+    12. Never retry non-recoverable failed steps.
 
-        Pending steps may be reused if they are still required.
+    13. When retrying a recoverable failed step,
+        populate:
+
+        replaces_step_id = <failed_step_id>
+
+    14. Pending steps may be reused if they are still required.
+
+    15. Replacement Steps
+
+        If you retry a recoverable failed step,
+        the newly created step MUST include:
+
+        replaces_step_id = <failed_step_id>
+
+        Example
+
+        Step 2 failed due to timeout.
+
+        Replacement:
+
+        id = 5
+
+        tool = rag
+
+        tool_input = ...
+
+        replaces_step_id = 2
+
+        If the step is not replacing another step,
+        set:
+
+        replaces_step_id = null
+
     """
     structured_llm = llm.with_structured_output(
         ReplannerOutput

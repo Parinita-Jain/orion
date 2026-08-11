@@ -1387,3 +1387,62 @@ def test_executor_branch_no_path():
         == StepStatus.SUCCESS
     )
 
+
+def test_executor_supersedes_replaced_step():
+
+    register_tool(
+        Tool(
+            name="dummy",
+            function=dummy_tool,
+            description="Dummy tool",
+            outputs=["answer"],
+        )
+    )
+
+    # Original failed step
+    original_step = PlanStep(
+        id=1,
+        tool="dummy",
+        tool_input="Original",
+        depends_on=[],
+    )
+
+    # Replacement step
+    replacement_step = PlanStep(
+        id=2,
+        tool="dummy",
+        tool_input="Retry",
+        depends_on=[],
+        replaces_step_id=1,
+    )
+
+    state = make_state(
+        steps=[replacement_step,],
+        tool_results={
+            1: {
+                "messages": [],
+                "output": {},
+                "success": False,
+                "status": StepStatus.FAILED,
+                "error": "Timed out",
+                "failure_reason": FailureReason.TIMEOUT,
+            }
+        },
+    )
+
+    result = executor_node(state)
+
+    assert (
+        result["tool_results"][1]["status"]
+        == StepStatus.SUPERSEDED
+    )
+
+    assert (
+        result["tool_results"][1]["success"]
+        is False
+    )
+
+    assert (
+        result["tool_results"][2]["status"]
+        == StepStatus.SUCCESS
+    )

@@ -4,21 +4,22 @@
 
 ### Added
 
-- CompletionStatus
-- Completion Node
-- Dynamic Replanning
+- Dynamic replanning
+- Completion node
 - Shared workflow types
 - Failure classification
-- Integration tests
+- GitHub Actions
 - Architecture documentation
+- ADRs
+- Integration testing
 
 ### Improved
 
-- Graph routing
+- Workflow routing
 - Replanner context
-- Documentation
+- Project documentation
 
 ### Known Limitation
 
-- Replanned steps are appended rather than replacing failed steps.
-- Step supersession will be introduced in Sprint 10.
+- Recoverable failed steps are preserved after replanning.
+- Step supersession is planned for Sprint 10.
