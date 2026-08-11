@@ -18,7 +18,7 @@ class PlanStep:
 
     condition: str | None = None
 
-    replaces_step_id: int | None = None
+    replaces: int | None = None
 
     
 @dataclass

@@ -1413,7 +1413,7 @@ def test_executor_supersedes_replaced_step():
         tool="dummy",
         tool_input="Retry",
         depends_on=[],
-        replaces_step_id=1,
+        replaces=1,
     )
 
     state = make_state(

@@ -202,7 +202,7 @@ def replanner_node(state):
     13. When retrying a recoverable failed step,
         populate:
 
-        replaces_step_id = <failed_step_id>
+        replaces = <failed_step_id>
 
     14. Pending steps may be reused if they are still required.
 
@@ -211,7 +211,7 @@ def replanner_node(state):
         If you retry a recoverable failed step,
         the newly created step MUST include:
 
-        replaces_step_id = <failed_step_id>
+        replaces = <failed_step_id>
 
         Example
 
@@ -225,12 +225,12 @@ def replanner_node(state):
 
         tool_input = ...
 
-        replaces_step_id = 2
+        replaces = 2
 
         If the step is not replacing another step,
         set:
 
-        replaces_step_id = null
+        replaces = null
 
     """
     structured_llm = llm.with_structured_output(

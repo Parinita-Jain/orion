@@ -104,3 +104,17 @@ The Replanner follows three important principles:
 1. Never recreate successful work.
 2. Generate only the additional work required.
 3. Preserve execution history for auditing and debugging.
+
+## Replacement Steps
+
+The replanner may generate replacement steps for recoverable failures.
+
+Replacement steps populate:
+
+replaces_step_id
+
+The replanner proposes replacements.
+
+It does not modify execution history.
+
+The Executor marks the original step as SUPERSEDED after successful execution.

@@ -84,3 +84,30 @@ docs/adr/
 ```
 
 for the architectural decisions that shaped Orion.
+
+## Step Supersession
+
+Recoverable failures may be replaced by new execution steps.
+
+Workflow:
+
+FAILED
+↓
+
+REPLAN
+
+↓
+
+Replacement Step
+
+↓
+
+SUCCESS
+
+↓
+
+SUPERSEDED
+
+↓
+
+COMPLETE

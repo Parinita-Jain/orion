@@ -63,7 +63,7 @@ def planner_node(state):
                     tool="direct",
                     tool_input="",
                     depends_on=[],
-                    replaces_step_id=None,
+                    replaces=None,
                 )
             ],
             "error": None,
@@ -85,7 +85,7 @@ def planner_node(state):
                     tool="calculator",
                     tool_input=question,
                     depends_on=[],
-                    replaces_step_id=None,
+                    replaces=None,
                 )
             ],
             "error": None,
@@ -435,7 +435,7 @@ def planner_node(state):
             output=step.output,
             timeout=None,
             condition=step.condition,
-            replaces_step_id=step.replaces_step_id,
+            replaces=step.replaces,
             approval=(
             ApprovalRequest(
                 step_id=step.id,

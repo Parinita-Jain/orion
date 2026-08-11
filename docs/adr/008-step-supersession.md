@@ -6,7 +6,7 @@ Step Supersession
 
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
@@ -44,3 +44,12 @@ Trade-offs
 
 - Additional execution state
 - Slightly more complex completion logic
+
+## Implementation
+
+Implemented in Sprint 10.
+
+- Added StepStatus.SUPERSEDED
+- Added replaces_step_id to PlanStep
+- Executor marks replaced failed steps as SUPERSEDED after successful execution.
+- Completion ignores superseded failures through status evaluation.
