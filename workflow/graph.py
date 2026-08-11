@@ -2,12 +2,12 @@ from langgraph.graph import StateGraph, START, END
 
 from state import AgentState
 
-from nodes import (
+from workflow.nodes import (
     agent_node,
     planner_node,
     executor_node
 )
-from completion import completion_node
+from .completion import completion_node
 from replanner import replanner_node
 from synthesizer import synthesizer_node
 from error_handler import error_handler_node

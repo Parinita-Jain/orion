@@ -1,6 +1,6 @@
 import tools
 
-from graph import app
+from workflow.graph import app
 from langchain_core.messages import HumanMessage
 from runtime.event_bus import EventBus
 from runtime.listeners import ConsoleEventListener

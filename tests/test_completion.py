@@ -1,4 +1,4 @@
-from completion import completion_node
+from workflow.completion import completion_node
 
 from shared_types.completion_status import CompletionStatus
 from shared_types.failure_reason import FailureReason

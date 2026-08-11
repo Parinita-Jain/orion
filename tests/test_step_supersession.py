@@ -10,7 +10,7 @@ from registry import Tool
 
 from executor import executor_node
 from replanner import replanner_node
-from completion import completion_node
+from workflow.completion import completion_node
 
 from runtime.runtime_config import RuntimeConfig
 from runtime.event_bus import EventBus
