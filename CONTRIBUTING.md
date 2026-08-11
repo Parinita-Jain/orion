@@ -41,3 +41,12 @@ Please include:
 - Operating system
 - Error message
 - Steps to reproduce
+
+## Pull Requests
+
+Before submitting a Pull Request, ensure that:
+
+- All tests pass (`pytest`)
+- New features include unit tests
+- Documentation has been updated if architecture or behavior changes
+- Commit messages clearly describe the change

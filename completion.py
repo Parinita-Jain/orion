@@ -16,9 +16,9 @@ def completion_node(state):
     # ---------------------------------
 
     for result in tool_results.values():
-
+        status = result["status"]
         if (
-            result["status"] == StepStatus.FAILED
+            status == StepStatus.FAILED
             and is_recoverable_failure(
                 result.get("failure_reason")
             )
@@ -34,9 +34,9 @@ def completion_node(state):
     # ---------------------------------
 
     for result in tool_results.values():
-
+        status = result["status"]
         if (
-            result["status"] == StepStatus.FAILED
+            status == StepStatus.FAILED
             and is_nonrecoverable_failure(
                 result.get("failure_reason")
             )

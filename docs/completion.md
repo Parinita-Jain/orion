@@ -134,3 +134,9 @@ This will allow the Completion Node to distinguish between:
 - Historical failures
 
 while preserving the execution history.
+
+## SUPERSEDED
+
+A step marked as SUPERSEDED represents a recoverable failed execution that has been successfully replaced by another execution step.
+
+SUPERSEDED steps are ignored during workflow completion evaluation while preserving execution history.

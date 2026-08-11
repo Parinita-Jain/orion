@@ -26,6 +26,8 @@ class PlanStep(BaseModel):
 
     condition: str | None = None
 
+    replaces: int | None = None
+
 class PlannerOutput(BaseModel):
 
     steps: list[PlanStep]

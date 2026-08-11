@@ -18,6 +18,8 @@ class PlanStep:
 
     condition: str | None = None
 
+    replaces: int | None = None
+
     
 @dataclass
 class Plan:

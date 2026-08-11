@@ -1,3 +1,5 @@
+[![Orion Tests](https://github.com/Parinita-Jain/orion/actions/workflows/tests.yml/badge.svg)](https://github.com/Parinita-Jain/orion/actions/workflows/tests.yml)
+
 # Orion — AI Workflow Orchestration Framework
 
 **Orion** is a modular AI workflow orchestration framework built on **LangGraph**.
