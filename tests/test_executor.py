@@ -18,7 +18,7 @@ from registry import (
     clear_registry,
 )
 
-from executor import (
+from executor.node import (
     execute_step,
     executor_node,
 )

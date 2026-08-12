@@ -8,7 +8,7 @@ from langchain_core.messages import (
 from registry import register_tool
 from registry import Tool
 
-from executor import executor_node
+from executor.node import executor_node
 from replanner import replanner_node
 from workflow.completion import completion_node
 

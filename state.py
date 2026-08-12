@@ -7,7 +7,7 @@ from langgraph.graph.message import add_messages
 from schemas import PlanStep
 from errors import OrionError
 
-from execution import ExecutionRecord
+from executor.execution import ExecutionRecord
 from config import logger
 
 from shared_types.completion_status import CompletionStatus

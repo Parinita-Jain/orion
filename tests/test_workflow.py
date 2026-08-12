@@ -6,7 +6,7 @@ from langchain_core.messages import HumanMessage
 from registry import Tool
 
 from planner import planner_node
-from executor import executor_node
+from executor.node import executor_node
 from registry import register_tool, clear_registry
 from schemas import PlannerOutput, PlanStep
 

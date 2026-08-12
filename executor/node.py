@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from langchain_core.messages import AIMessage
 
-from execution import ExecutionRecord
+from executor.execution import ExecutionRecord
 from registry import get_tool
 
 from utils import (
@@ -14,7 +14,7 @@ from utils import (
 from config import logger
 from runtime.retry import execute_with_retry
 
-from execution_summary import ExecutionSummary
+from executor.execution_summary import ExecutionSummary
 from shared_types.step_status import StepStatus
 
 from runtime.event import WorkflowEvent
