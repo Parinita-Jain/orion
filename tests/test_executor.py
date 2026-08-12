@@ -42,6 +42,7 @@ def make_state(**overrides):
         "tool_results": {},
         "execution_records": [],
         "runtime_config": RuntimeConfig(),
+        "workflow_id": "test-workflow",
         "event_bus": EventBus(),
     }
 

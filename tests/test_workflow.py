@@ -22,6 +22,7 @@ def make_state(**overrides):
         "tool_results": {},
         "execution_records": [],
         "runtime_config": RuntimeConfig(),
+        "workflow_id": "test-workflow",
     }
 
     state.update(overrides)

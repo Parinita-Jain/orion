@@ -1,0 +1,30 @@
+{
+    "workflow_id": "test-workflow",
+    "iteration": 0,
+    "steps": [
+        {
+            "id": 1,
+            "tool": "echo",
+            "tool_input": "Hello Orion",
+            "depends_on": [],
+            "output": null,
+            "timeout": null,
+            "approval": null,
+            "condition": null,
+            "replaces": null
+        },
+        {
+            "id": 2,
+            "tool": "echo",
+            "tool_input": "Repeat: #1.answer",
+            "depends_on": [
+                1
+            ],
+            "output": null,
+            "timeout": null,
+            "approval": null,
+            "condition": null,
+            "replaces": null
+        }
+    ]
+}
