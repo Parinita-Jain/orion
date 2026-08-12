@@ -1,5 +1,5 @@
 import tools
-
+import uuid
 from workflow.graph import app
 from langchain_core.messages import HumanMessage
 from runtime.event_bus import EventBus
@@ -8,6 +8,8 @@ from runtime.logging_listener import LoggingEventListener
 from runtime.metrics_listener import MetricsListener
 from runtime.audit_listener import AuditListener
 from runtime.runtime_config import RuntimeConfig
+
+
 
 conversation = []
 
@@ -34,7 +36,10 @@ while True:
         HumanMessage(content=question)
     )
 
+    workflow_id = str(uuid.uuid4())
+
     state = {
+        "workflow_id": workflow_id,
         "messages": conversation,
         "steps": [],
         "tool_results": {},
@@ -47,8 +52,11 @@ while True:
         "iteration": 0,
         "errors": [],
         "error": None,
-        "event_bus": bus,      # <-- Add this here
+        "runtime_config": RuntimeConfig(),
+        "event_bus": bus,      # <-- Add this here        
+    
     }
+    print(workflow_id)
     result = app.invoke(state)
     print(metrics.snapshot())
     for event in audit.history():

@@ -9,11 +9,9 @@ from .serializer import (
 WORKFLOW_DIR = Path("data/workflows")
 WORKFLOW_DIR.mkdir(parents=True, exist_ok=True)
 
-def save_workflow(state):
+def save_workflow( workflow_id: str,state,):
 
     data = serialize_state(state)
-
-    workflow_id = data["workflow_id"]
 
     path = WORKFLOW_DIR / f"{workflow_id}.json"
 

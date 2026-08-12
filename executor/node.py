@@ -31,6 +31,8 @@ from runtime.approval_decision import ApprovalDecision
 
 from condition import evaluate_condition
 
+from persistence import save_workflow
+
 def execute_step(step, state, tool_results):
 
     tool_name = step.tool
@@ -721,6 +723,12 @@ def executor_node(state):
         )
     )
 
+
+    save_workflow(
+        state["workflow_id"],
+        state,
+    )
+    
     return {
         "tool_results": tool_results,
         "execution_records": execution_records,

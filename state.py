@@ -12,6 +12,9 @@ from config import logger
 
 from shared_types.completion_status import CompletionStatus
 
+from runtime.runtime_config import RuntimeConfig
+from runtime.event_bus import EventBus
+
 class AgentState(TypedDict):
 
     messages: Annotated[
@@ -42,3 +45,11 @@ class AgentState(TypedDict):
     errors: list[str]
 
     iteration: int
+
+    workflow_id: str
+
+    completion_status: CompletionStatus
+
+    runtime_config: RuntimeConfig
+
+    event_bus: EventBus
