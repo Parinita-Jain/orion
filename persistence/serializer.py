@@ -2,6 +2,8 @@ from models.plan import PlanStep
 
 from dataclasses import asdict,is_dataclass
 
+from shared_types.completion_status import CompletionStatus
+
 def serialize_step(step):
     if is_dataclass(step):
         return asdict(step)
@@ -38,7 +40,12 @@ def serialize_state(state):
                 "tool_results",
                 {},
             ).items()
-        }
+        },
+        "completion_status": (
+            state["completion_status"].value
+            if state.get("completion_status") is not None
+            else None
+        ),
     }
 
 def deserialize_state(data):
@@ -57,4 +64,9 @@ def deserialize_state(data):
                 {},
             ).items()
         },
+        "completion_status": (
+            CompletionStatus(data["completion_status"])
+            if data.get("completion_status") is not None
+            else None
+        ),
     }

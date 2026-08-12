@@ -3,6 +3,7 @@ from models.plan import PlanStep
 import json
 from pathlib import Path
 
+from shared_types.completion_status import CompletionStatus
 
 def test_save_workflow_creates_json():
 
@@ -25,13 +26,16 @@ def test_save_workflow_creates_json():
                 },
             },
         },
+        "completion_status": CompletionStatus.COMPLETE,
     }
-    
+
+   
 
     save_workflow(
         "test-save",
         state,
     )
+    restored = load_workflow("test-save")
 
     path = Path("data/workflows/test-save.json")
 
@@ -42,6 +46,11 @@ def test_save_workflow_creates_json():
 
     assert data["workflow_id"] == "test-save"
     assert data["iteration"] == 1
+
+    assert (
+        restored["completion_status"]
+        == CompletionStatus.COMPLETE
+    )
 
     path.unlink()
 
@@ -66,10 +75,13 @@ def test_load_workflow_restores_state():
                 },
             },
         },
+        "completion_status": CompletionStatus.COMPLETE,
     }
     save_workflow("test-save", state)
 
     restored = load_workflow("test-save") 
+
+    
 
     assert restored["workflow_id"] == state["workflow_id"]
 
@@ -78,5 +90,10 @@ def test_load_workflow_restores_state():
     assert restored["steps"] == state["steps"]
 
     assert restored["tool_results"][1]["success"] is True
+
+    assert (
+        restored["completion_status"]
+        == CompletionStatus.COMPLETE
+    )
 
     Path("data/workflows/test-save.json").unlink()

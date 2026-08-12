@@ -46,5 +46,6 @@
             "error": null,
             "failure_reason": null
         }
-    }
+    },
+    "completion_status": null
 }
