@@ -26,5 +26,25 @@
             "condition": null,
             "replaces": null
         }
-    ]
+    ],
+    "tool_results": {
+        "1": {
+            "output": {
+                "answer": "Hello Orion"
+            },
+            "success": true,
+            "status": null,
+            "error": null,
+            "failure_reason": null
+        },
+        "2": {
+            "output": {
+                "answer": "Repeat: Hello Orion"
+            },
+            "success": true,
+            "status": "success",
+            "error": null,
+            "failure_reason": null
+        }
+    }
 }

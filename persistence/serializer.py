@@ -13,6 +13,16 @@ def serialize_step(step):
         f"Unsupported step type: {type(step)}"
     )
 
+def serialize_tool_result(result):
+
+    return {
+        "output": result.get("output"),
+        "success": result.get("success"),
+        "status": result.get("status"),
+        "error": result.get("error"),
+        "failure_reason": result.get("failure_reason"),
+    }
+
 def serialize_state(state):
 
     return {
@@ -22,6 +32,13 @@ def serialize_state(state):
             serialize_step(step)
             for step in state.get("steps", [])
         ],
+        "tool_results": {
+            int(step_id): serialize_tool_result(result)
+            for step_id, result in state.get(
+                "tool_results",
+                {},
+            ).items()
+        }
     }
 
 def deserialize_state(data):
@@ -33,4 +50,11 @@ def deserialize_state(data):
             PlanStep(**step)
             for step in data.get("steps", [])
         ],
+        "tool_results": {
+            int(step_id): result
+            for step_id, result in data.get(
+                "tool_results",
+                {},
+            ).items()
+        },
     }

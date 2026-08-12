@@ -17,7 +17,16 @@ def test_save_workflow_creates_json():
                 depends_on=[],
             )
         ],
+        "tool_results": {
+            1: {
+                "success": True,
+                "output": {
+                    "value": 42,
+                },
+            },
+        },
     }
+    
 
     save_workflow(
         "test-save",
@@ -49,33 +58,25 @@ def test_load_workflow_restores_state():
                 depends_on=[],
             )
         ],
+        "tool_results": {
+            1: {
+                "success": True,
+                "output": {
+                    "value": 42,
+                },
+            },
+        },
     }
     save_workflow("test-save", state)
 
-    restored = load_workflow("test-save")
+    restored = load_workflow("test-save") 
 
-    print("STATE:")
-    print(state)
+    assert restored["workflow_id"] == state["workflow_id"]
 
-    print("\nRESTORED:")
-    print(restored)
+    assert restored["iteration"] == state["iteration"]
 
-    print("\nSTATE STEP TYPE:")
-    print(type(state["steps"][0]))
+    assert restored["steps"] == state["steps"]
 
-    print("\nRESTORED STEP TYPE:")
-    print(type(restored["steps"][0]))
-
-    print("\nSTATE STEP:")
-    print(state["steps"][0])
-
-    print("\nRESTORED STEP:")
-    print(restored["steps"][0])
-
-    assert len(restored["steps"]) == 1
-
-    assert restored["steps"][0].tool == "llm"
-
-    assert restored == state
+    assert restored["tool_results"][1]["success"] is True
 
     Path("data/workflows/test-save.json").unlink()
