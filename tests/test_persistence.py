@@ -7,6 +7,8 @@ from shared_types.completion_status import CompletionStatus
 
 from models.execution_record import ExecutionRecord
 
+from langchain_core.messages import HumanMessage, AIMessage
+
 def test_save_workflow_creates_json():
 
     state = {
@@ -96,12 +98,17 @@ def test_load_workflow_restores_state():
             1: {
                 "success": True,
                 "output": {
-                    "value": 42,
+                    "value": 5,
                 },
             },
         },
         "completion_status": CompletionStatus.COMPLETE,
+        "messages": [
+                HumanMessage(content="5+6"),
+                AIMessage(content="The sum of 5 and 6 is 11."),
+            ],
     }
+    
     save_workflow("test-save", state)
 
     restored = load_workflow("test-save") 
@@ -120,5 +127,11 @@ def test_load_workflow_restores_state():
         restored["completion_status"]
         == CompletionStatus.COMPLETE
     )
+
+    assert restored["messages"][0].type == "human"
+    assert restored["messages"][0].content == "5+6"
+
+    assert restored["messages"][1].type == "ai"
+    assert restored["messages"][1].content == "The sum of 5 and 6 is 11."
 
     Path("data/workflows/test-save.json").unlink()

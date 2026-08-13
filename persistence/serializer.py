@@ -6,6 +6,8 @@ from shared_types.completion_status import CompletionStatus
 
 from models.execution_record import ExecutionRecord
 
+from langchain_core.messages import HumanMessage, AIMessage
+
 
 def serialize_step(step):
     if is_dataclass(step):
@@ -29,6 +31,13 @@ def serialize_tool_result(result):
         "status": result.get("status"),
         "error": result.get("error"),
         "failure_reason": result.get("failure_reason"),
+    }
+
+def serialize_message(message):
+    return {
+        "type": message.type,
+        "content": message.content,
+        "id": message.id,
     }
 
 def serialize_state(state):
@@ -56,7 +65,22 @@ def serialize_state(state):
             serialize_execution_record(record)
             for record in state.get("execution_records", [])
         ],
+        "messages": [
+            serialize_message(message)
+            for message in state.get("messages", [])
+        ],
     }
+
+def deserialize_message(message):
+    if message["type"] == "human":
+        return HumanMessage(content=message["content"])
+
+    if message["type"] == "ai":
+        return AIMessage(content=message["content"])
+
+    raise ValueError(
+        f"Unsupported message type: {message['type']}"
+    )
 
 def deserialize_state(data):
 
@@ -82,5 +106,9 @@ def deserialize_state(data):
         "execution_records": [
             ExecutionRecord(**record)
             for record in data.get("execution_records", [])
+        ],
+        "messages": [
+            deserialize_message(message)
+            for message in data.get("messages", [])
         ],
     }

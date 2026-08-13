@@ -54,10 +54,17 @@
             "tool": "echo",
             "success": true,
             "retries": 0,
-            "start_time": 6833649.9084039,
-            "end_time": 6833649.9094496,
-            "duration": 0.00104569923132658,
+            "start_time": 6836300.04392,
+            "end_time": 6836300.0458065,
+            "duration": 0.001886500045657158,
             "error": null
+        }
+    ],
+    "messages": [
+        {
+            "type": "human",
+            "content": "Resume workflow.",
+            "id": null
         }
     ]
 }
