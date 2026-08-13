@@ -3,7 +3,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from langchain_core.messages import AIMessage
 
-from executor.execution import ExecutionRecord
+from models.execution_record import ExecutionRecord
+
 from registry import get_tool
 
 from utils import (

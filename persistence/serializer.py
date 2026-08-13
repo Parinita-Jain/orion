@@ -4,6 +4,9 @@ from dataclasses import asdict,is_dataclass
 
 from shared_types.completion_status import CompletionStatus
 
+from models.execution_record import ExecutionRecord
+
+
 def serialize_step(step):
     if is_dataclass(step):
         return asdict(step)
@@ -14,6 +17,9 @@ def serialize_step(step):
     raise TypeError(
         f"Unsupported step type: {type(step)}"
     )
+
+def serialize_execution_record(record):
+    return asdict(record)
 
 def serialize_tool_result(result):
 
@@ -46,6 +52,10 @@ def serialize_state(state):
             if state.get("completion_status") is not None
             else None
         ),
+        "execution_records": [
+            serialize_execution_record(record)
+            for record in state.get("execution_records", [])
+        ],
     }
 
 def deserialize_state(data):
@@ -69,4 +79,8 @@ def deserialize_state(data):
             if data.get("completion_status") is not None
             else None
         ),
+        "execution_records": [
+            ExecutionRecord(**record)
+            for record in data.get("execution_records", [])
+        ],
     }

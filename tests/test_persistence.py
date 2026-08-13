@@ -5,6 +5,8 @@ from pathlib import Path
 
 from shared_types.completion_status import CompletionStatus
 
+from models.execution_record import ExecutionRecord
+
 def test_save_workflow_creates_json():
 
     state = {
@@ -27,6 +29,18 @@ def test_save_workflow_creates_json():
             },
         },
         "completion_status": CompletionStatus.COMPLETE,
+        "execution_records": [
+            ExecutionRecord(
+                step_id=5,
+                tool="llm",
+                success=True,
+                retries=0,
+                start_time=100.0,
+                end_time=101.5,
+                duration=1.5,
+                error=None,
+            )
+        ],
     }
 
    
@@ -36,6 +50,17 @@ def test_save_workflow_creates_json():
         state,
     )
     restored = load_workflow("test-save")
+
+    assert len(restored["execution_records"]) == 1
+
+    record = restored["execution_records"][0]
+
+    assert record.step_id == 5
+    assert record.tool == "llm"
+    assert record.success is True
+    assert record.retries == 0
+    assert record.duration == 1.5
+    assert record.error is None
 
     path = Path("data/workflows/test-save.json")
 
