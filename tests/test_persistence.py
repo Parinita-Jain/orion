@@ -226,3 +226,97 @@ def test_persisted_workflow_resumes_from_partial_progress():
     assert result["execution_records"][0].step_id == 2
 
     Path("data/workflows/resume-test.json").unlink()
+
+def test_persisted_workflow_resumes_after_multiple_completed_steps():
+
+    state = {
+        "workflow_id": "resume-multi-test",
+        "iteration": 2,
+
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="calculator",
+                tool_input="2+3",
+                depends_on=[],
+            ),
+            PlanStep(
+                id=2,
+                tool="calculator",
+                tool_input="10+20",
+                depends_on=[],
+            ),
+            PlanStep(
+                id=3,
+                tool="calculator",
+                tool_input="100+200",
+                depends_on=[1, 2],
+            ),
+        ],
+
+        "context": {
+            "step_1": {
+                "value": 5,
+            },
+            "step_2": {
+                "value": 30,
+            },
+        },
+
+        "tool_results": {
+            1: {
+                "success": True,
+                "output": {
+                    "value": 5,
+                },
+                "status": StepStatus.SUCCESS,
+                "error": None,
+            },
+            2: {
+                "success": True,
+                "output": {
+                    "value": 30,
+                },
+                "status": StepStatus.SUCCESS,
+                "error": None,
+            },
+        },
+
+        "execution_records": [],
+
+        "completion_status": None,
+
+        "messages": [],
+
+        "runtime_config": RuntimeConfig(),
+    }
+
+    clear_registry()
+    importlib.reload(tools)
+
+    save_workflow("resume-multi-test", state)
+
+    restored = load_workflow("resume-multi-test")
+
+    restored["runtime_config"] = RuntimeConfig()
+
+    result = executor_node(restored)
+
+    # Previously completed steps must remain intact.
+    assert result["tool_results"][1]["success"] is True
+    assert result["tool_results"][2]["success"] is True
+
+    # Only the pending step should execute.
+    assert result["tool_results"][3]["success"] is True
+    assert result["tool_results"][3]["output"]["value"] == 300
+
+    # Only Step 3 should have produced a new execution record.
+    assert len(result["execution_records"]) == 1
+    assert result["execution_records"][0].step_id == 3
+
+    # Context from all three steps should be available.
+    assert result["context"]["step_1"]["value"] == 5
+    assert result["context"]["step_2"]["value"] == 30
+    assert result["context"]["step_3"]["value"] == 300
+
+    Path("data/workflows/resume-multi-test.json").unlink()
