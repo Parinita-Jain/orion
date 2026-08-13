@@ -1,6 +1,14 @@
+import tools
+import json
+
+import importlib
+
+
+from registry import clear_registry
+
 from persistence import (save_workflow,load_workflow,)
 from models.plan import PlanStep
-import json
+
 from pathlib import Path
 
 from shared_types.completion_status import CompletionStatus
@@ -8,6 +16,13 @@ from shared_types.completion_status import CompletionStatus
 from models.execution_record import ExecutionRecord
 
 from langchain_core.messages import HumanMessage, AIMessage
+
+from unittest.mock import patch
+from executor.node import executor_node
+from runtime.runtime_config import RuntimeConfig
+from models.plan import PlanStep
+
+from shared_types.step_status import StepStatus
 
 def test_save_workflow_creates_json():
 
@@ -135,3 +150,79 @@ def test_load_workflow_restores_state():
     assert restored["messages"][1].content == "The sum of 5 and 6 is 11."
 
     Path("data/workflows/test-save.json").unlink()
+
+def test_persisted_workflow_resumes_from_partial_progress():
+
+    state = {
+        "workflow_id": "resume-test",
+        "iteration": 1,
+
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="calculator",
+                tool_input="2+3",
+                depends_on=[],
+            ),
+            PlanStep(
+                id=2,
+                tool="calculator",
+                tool_input="10+20",
+                depends_on=[1],
+            ),
+        ],
+
+        "context": {
+            "step_1": {
+                "value": 5
+            }
+        },
+        "tool_results": {
+            1: {
+                "success": True,
+                "output": {
+                    "value": 5
+                },
+                "status": StepStatus.SUCCESS,
+                "error": None,
+            }
+        },
+
+        "execution_records": [],
+
+        "completion_status": None,
+
+        "messages": [],
+
+        "runtime_config": RuntimeConfig(),
+    }
+
+    clear_registry()
+    importlib.reload(tools)
+
+    save_workflow("resume-test", state)
+
+    restored = load_workflow("resume-test")
+
+    # Runtime-only objects are reconstructed after loading.
+    restored["runtime_config"] = RuntimeConfig()
+
+    result = executor_node(restored)
+
+
+    assert 1 in restored["tool_results"]
+    assert 2 in result["tool_results"]
+
+    # Step 1 was already complete.
+    # Only Step 2 should have been executed.
+
+    assert result["tool_results"][2]["success"] is True
+    assert result["tool_results"][2]["output"]["value"] == 30
+
+    assert len(result["execution_records"]) == 1
+    assert result["execution_records"][0].step_id == 2
+    assert len(result["execution_records"]) == 1
+
+    assert result["execution_records"][0].step_id == 2
+
+    Path("data/workflows/resume-test.json").unlink()
