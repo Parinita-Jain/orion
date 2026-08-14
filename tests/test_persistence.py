@@ -320,3 +320,241 @@ def test_persisted_workflow_resumes_after_multiple_completed_steps():
     assert result["context"]["step_3"]["value"] == 300
 
     Path("data/workflows/resume-multi-test.json").unlink()
+
+def test_checkpoint_preserves_completed_steps_before_later_failure():
+
+    state = {
+        "workflow_id": "checkpoint-failure-test",
+        "iteration": 1,
+
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="calculator",
+                tool_input="2+3",
+                depends_on=[],
+            ),
+            PlanStep(
+                id=2,
+                tool="calculator",
+                tool_input="10+20",
+                depends_on=[1],
+            ),
+            PlanStep(
+                id=3,
+                tool="does_not_exist",
+                tool_input="anything",
+                depends_on=[2],
+            ),
+        ],
+
+        "context": {},
+        "tool_results": {},
+        "execution_records": [],
+        "completion_status": None,
+        "messages": [],
+        "runtime_config": RuntimeConfig(),
+    }
+
+    clear_registry()
+    importlib.reload(tools)
+
+    save_workflow(
+        "checkpoint-failure-test",
+        state,
+    )
+
+    restored = load_workflow(
+        "checkpoint-failure-test"
+    )
+
+    restored["runtime_config"] = RuntimeConfig()
+
+    result = executor_node(restored)
+
+    # Steps 1 and 2 should have completed.
+    assert result["tool_results"][1]["success"] is True
+    assert result["tool_results"][2]["success"] is True
+
+    # Step 3 should have failed because the tool does not exist.
+    assert result["tool_results"][3]["success"] is False
+
+    # Now inspect the persisted checkpoint.
+    persisted = load_workflow(
+        "checkpoint-failure-test"
+    )
+
+    assert 1 in persisted["tool_results"]
+    assert 2 in persisted["tool_results"]
+
+    Path(
+        "data/workflows/checkpoint-failure-test.json"
+    ).unlink()
+
+def test_step_checkpoint_survives_interruption():
+
+    state = {
+        "workflow_id": "step-interruption-test",
+        "iteration": 1,
+
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="calculator",
+                tool_input="2+3",
+                depends_on=[],
+            ),
+            PlanStep(
+                id=2,
+                tool="calculator",
+                tool_input="10+20",
+                depends_on=[1],
+            ),
+        ],
+
+        "context": {},
+        "tool_results": {},
+        "execution_records": [],
+        "completion_status": None,
+        "messages": [],
+        "runtime_config": RuntimeConfig(),
+    }
+
+    clear_registry()
+    importlib.reload(tools)
+
+    save_workflow(
+        "step-interruption-test",
+        state,
+    )
+
+    restored = load_workflow(
+        "step-interruption-test"
+    )
+
+    restored["runtime_config"] = RuntimeConfig()
+
+    real_checkpoint = __import__(
+        "executor.node",
+        fromlist=["checkpoint_state"],
+    ).checkpoint_state
+
+    checkpoint_count = 0
+
+    def interrupted_checkpoint(state):
+        nonlocal checkpoint_count
+
+        checkpoint_count += 1
+
+        if checkpoint_count == 1:
+            real_checkpoint(state)
+            return
+
+        raise RuntimeError(
+            "Simulated process interruption"
+        )
+
+    with patch(
+        "executor.node.checkpoint_state",
+        side_effect=interrupted_checkpoint,
+    ):
+
+        try:
+            executor_node(restored)
+        except RuntimeError:
+            pass
+
+    persisted = load_workflow(
+        "step-interruption-test"
+    )
+
+    # Step 1 completed and was checkpointed.
+    assert 1 in persisted["tool_results"]
+    assert (
+        persisted["tool_results"][1]["success"]
+        is True
+    )
+
+    # Step 2 had not been checkpointed yet.
+    assert 2 not in persisted["tool_results"]
+
+    Path(
+        "data/workflows/step-interruption-test.json"
+    ).unlink()
+
+
+def test_parallel_steps_are_checkpointed_correctly():
+
+    state = {
+        "workflow_id": "parallel-checkpoint-test",
+        "iteration": 1,
+
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="calculator",
+                tool_input="2+3",
+                depends_on=[],
+            ),
+            PlanStep(
+                id=2,
+                tool="calculator",
+                tool_input="10+20",
+                depends_on=[],
+            ),
+            PlanStep(
+                id=3,
+                tool="calculator",
+                tool_input="100+200",
+                depends_on=[1, 2],
+            ),
+        ],
+
+        "context": {},
+        "tool_results": {},
+        "execution_records": [],
+        "completion_status": None,
+        "messages": [],
+        "runtime_config": RuntimeConfig(),
+    }
+
+    clear_registry()
+    importlib.reload(tools)
+
+    save_workflow(
+        "parallel-checkpoint-test",
+        state,
+    )
+
+    restored = load_workflow(
+        "parallel-checkpoint-test"
+    )
+
+    restored["runtime_config"] = RuntimeConfig()
+
+    result = executor_node(restored)
+
+    # Both independent steps must complete.
+    assert result["tool_results"][1]["success"] is True
+    assert result["tool_results"][2]["success"] is True
+
+    # The dependent step must then complete.
+    assert result["tool_results"][3]["success"] is True
+    assert result["tool_results"][3]["output"]["value"] == 300
+
+    # All three results must be present in the final checkpoint.
+    persisted = load_workflow(
+        "parallel-checkpoint-test"
+    )
+
+    assert 1 in persisted["tool_results"]
+    assert 2 in persisted["tool_results"]
+    assert 3 in persisted["tool_results"]
+
+    assert persisted["tool_results"][1]["output"]["value"] == 5
+    assert persisted["tool_results"][2]["output"]["value"] == 30
+    assert persisted["tool_results"][3]["output"]["value"] == 300
+
+    Path(
+        "data/workflows/parallel-checkpoint-test.json"
+    ).unlink() 

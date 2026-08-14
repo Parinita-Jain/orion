@@ -245,6 +245,12 @@ def failed_dependencies(step, tool_results):
 
     return failed
 
+def checkpoint_state(state):
+    save_workflow(
+        state["workflow_id"],
+        state,
+    )
+
 def executor_node(state):
 
     approval_request = None
@@ -649,6 +655,13 @@ def executor_node(state):
                 if step in pending_steps:
                     pending_steps.remove(step)
 
+                # Persist the state after this step has been
+                # completely incorporated into the workflow state.
+                state["tool_results"] = tool_results
+                state["execution_records"] = execution_records
+
+                checkpoint_state(state)
+
                 if result["success"]:
                     logger.info(
                         "Completed step %d",
@@ -725,10 +738,7 @@ def executor_node(state):
     )
 
 
-    save_workflow(
-        state["workflow_id"],
-        state,
-    )
+    checkpoint_state(state)
     
     return {
         "tool_results": tool_results,
