@@ -28,7 +28,7 @@ from registry import Tool, register_tool, clear_registry
 
 from runtime.approval_request import ApprovalRequest
 
-
+from workflow.completion import completion_node
 
 def test_save_workflow_creates_json():
 
@@ -1044,5 +1044,104 @@ def test_pending_approval_does_not_execute_after_restart():
 
     Path(
         "data/workflows/approval-resume-test.json"
+    ).unlink()
+
+
+def test_completed_workflow_does_not_execute_again_after_restart():
+
+    execution_count = 0
+
+    def counting_tool(input_text):
+        nonlocal execution_count
+
+        execution_count += 1
+
+        return {
+            "messages": [
+                AIMessage(content="Executed")
+            ],
+            "output": {
+                "value": 42,
+            },
+            "success": True,
+            "status": StepStatus.SUCCESS,
+            "error": None,
+        }
+
+    clear_registry()
+
+    register_tool(
+        Tool(
+            name="completed_tool",
+            function=counting_tool,
+            description="Tool used to test completed workflow restart.",
+            outputs=["value"],
+        )
+    )
+
+    state = {
+        "workflow_id": "completed-restart-test",
+        "iteration": 1,
+
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="completed_tool",
+                tool_input="run",
+                depends_on=[],
+            )
+        ],
+
+        "context": {},
+        "tool_results": {},
+        "execution_records": [],
+        "completion_status": None,
+        "messages": [],
+        "runtime_config": RuntimeConfig(),
+    }
+
+    # First execution.
+    result = executor_node(state)
+
+    completion = completion_node(state)
+    
+    state.update(completion)
+
+    assert execution_count == 1
+    assert result["tool_results"][1]["success"] is True
+
+    
+
+    # The workflow should now be complete.
+    save_workflow(
+        "completed-restart-test",
+        state,
+    )
+
+    # Simulate restart.
+    restored = load_workflow(
+        "completed-restart-test",
+    )
+
+    assert (
+        restored["completion_status"]
+        == CompletionStatus.COMPLETE
+    )
+        
+
+    restored["runtime_config"] = RuntimeConfig()
+
+    # Restart the already-completed workflow.
+    result = executor_node(restored)
+
+    
+    # Tool must not execute again.
+    assert execution_count == 1
+
+    # Existing successful result must remain.
+    assert result["tool_results"][1]["success"] is True
+
+    Path(
+        "data/workflows/completed-restart-test.json"
     ).unlink()
 
