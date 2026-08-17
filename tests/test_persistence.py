@@ -1145,3 +1145,178 @@ def test_completed_workflow_does_not_execute_again_after_restart():
         "data/workflows/completed-restart-test.json"
     ).unlink()
 
+def test_restart_executes_only_remaining_dependent_steps():
+
+    execution_counts = {
+        "step_1": 0,
+        "step_2": 0,
+    }
+
+    def first_tool(input_text):
+        execution_counts["step_1"] += 1
+
+        return {
+            "messages": [
+                AIMessage(content="Step 1 executed")
+            ],
+            "output": {
+                "value": 5,
+            },
+            "success": True,
+            "status": StepStatus.SUCCESS,
+            "error": None,
+        }
+
+    def second_tool(input_text):
+        execution_counts["step_2"] += 1
+
+        return {
+            "messages": [
+                AIMessage(content="Step 2 executed")
+            ],
+            "output": {
+                "value": 30,
+            },
+            "success": True,
+            "status": StepStatus.SUCCESS,
+            "error": None,
+        }
+
+    clear_registry()
+
+    register_tool(
+        Tool(
+            name="first_tool",
+            function=first_tool,
+            description="First dependency step.",
+            outputs=["value"],
+        )
+    )
+
+    register_tool(
+        Tool(
+            name="second_tool",
+            function=second_tool,
+            description="Second dependent step.",
+            outputs=["value"],
+        )
+    )
+
+    state = {
+        "workflow_id": "dependency-restart-test",
+        "iteration": 1,
+
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="first_tool",
+                tool_input="2+3",
+                depends_on=[],
+            ),
+            PlanStep(
+                id=2,
+                tool="second_tool",
+                tool_input="use step 1",
+                depends_on=[1],
+            ),
+        ],
+
+        "context": {},
+        "tool_results": {},
+        "execution_records": [],
+        "completion_status": None,
+        "messages": [],
+        "runtime_config": RuntimeConfig(),
+    }
+
+    save_workflow(
+        "dependency-restart-test",
+        state,
+    )
+
+    restored = load_workflow(
+        "dependency-restart-test"
+    )
+
+    restored["runtime_config"] = RuntimeConfig()
+
+    real_checkpoint = __import__(
+        "executor.node",
+        fromlist=["checkpoint_state"],
+    ).checkpoint_state
+
+    checkpoint_count = 0
+
+    def interrupted_checkpoint(state):
+        nonlocal checkpoint_count
+
+        checkpoint_count += 1
+
+        if checkpoint_count == 1:
+            real_checkpoint(state)
+            return
+
+        raise RuntimeError(
+            "Simulated process interruption"
+        )
+
+    # First execution:
+    # Step 1 succeeds and is persisted.
+    # Step 2 succeeds in memory but its checkpoint is interrupted.
+    with patch(
+        "executor.node.checkpoint_state",
+        side_effect=interrupted_checkpoint,
+    ):
+
+        try:
+            executor_node(restored)
+        except RuntimeError:
+            pass
+
+    # Step 1 and Step 2 both executed once.
+    assert execution_counts["step_1"] == 1
+    assert execution_counts["step_2"] == 1
+
+    # Only Step 1 should have survived the interruption.
+    persisted = load_workflow(
+        "dependency-restart-test"
+    )
+
+    assert 1 in persisted["tool_results"]
+    assert (
+        persisted["tool_results"][1]["success"]
+        is True
+    )
+
+    assert 2 not in persisted["tool_results"]
+
+    # Step 1's context must also have survived.
+    assert (
+        persisted["context"]["step_1"]["value"]
+        == 5
+    )
+
+    # Simulate restart.
+    persisted["runtime_config"] = RuntimeConfig()
+
+    result = executor_node(persisted)
+
+    # Step 1 must NOT execute again.
+    assert execution_counts["step_1"] == 1
+
+    # Step 2 must execute now.
+    assert execution_counts["step_2"] == 2
+
+    assert (
+        result["tool_results"][1]["success"]
+        is True
+    )
+
+    assert (
+        result["tool_results"][2]["success"]
+        is True
+    )
+
+    Path(
+        "data/workflows/dependency-restart-test.json"
+    ).unlink()
