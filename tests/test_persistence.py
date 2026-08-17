@@ -24,6 +24,8 @@ from models.plan import PlanStep
 
 from shared_types.step_status import StepStatus
 
+from registry import Tool, register_tool, clear_registry
+
 def test_save_workflow_creates_json():
 
     state = {
@@ -701,3 +703,188 @@ def test_restart_resumes_from_persisted_progress():
         "data/workflows/restart-resume-test.json"
     ).unlink()
 
+def test_completed_step_is_not_executed_again_after_restart():
+
+    execution_count = 0
+
+    def counting_tool(input_text):
+        nonlocal execution_count
+
+        execution_count += 1
+
+        return {
+            "messages": [
+                AIMessage(content="Executed")
+            ],
+            "output": {
+                "value": 42
+            },
+            "success": True,
+            "status": StepStatus.SUCCESS,
+            "error": None,
+        }
+
+    clear_registry()
+
+    register_tool(
+        Tool(
+            name="counting_tool",
+            function=counting_tool,
+            description="Test tool that counts executions.",
+            outputs=["value"],
+        )
+    )
+
+    state = {
+        "workflow_id": "idempotency-test",
+        "iteration": 1,
+
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="counting_tool",
+                tool_input="run",
+                depends_on=[],
+            )
+        ],
+
+        "context": {},
+        "tool_results": {},
+        "execution_records": [],
+        "completion_status": None,
+        "messages": [],
+        "runtime_config": RuntimeConfig(),
+    }
+
+    # First execution.
+    result = executor_node(state)
+
+    assert result["tool_results"][1]["success"] is True
+    assert execution_count == 1
+
+    # Persist the completed workflow.
+    save_workflow(
+        "idempotency-test",
+        state,
+    )
+
+    # Simulate restart.
+    restored = load_workflow(
+        "idempotency-test",
+    )
+
+    restored["runtime_config"] = RuntimeConfig()
+
+    # Execute the workflow again.
+    result = executor_node(restored)
+
+    # Step 1 was already completed.
+    # It must NOT execute again.
+    assert execution_count == 1
+
+    assert result["tool_results"][1]["success"] is True
+
+    Path(
+        "data/workflows/idempotency-test.json"
+    ).unlink()
+
+def test_failed_step_is_retried_after_restart():
+
+    execution_count = 0
+
+    def retryable_tool(input_text):
+        nonlocal execution_count
+
+        execution_count += 1
+
+        if execution_count == 1:
+            return {
+                "messages": [
+                    AIMessage(content="First attempt failed")
+                ],
+                "output": {},
+                "success": False,
+                "status": StepStatus.FAILED,
+                "error": "Temporary failure",
+            }
+
+        return {
+            "messages": [
+                AIMessage(content="Second attempt succeeded")
+            ],
+            "output": {
+                "value": 42,
+            },
+            "success": True,
+            "status": StepStatus.SUCCESS,
+            "error": None,
+        }
+
+    clear_registry()
+
+    register_tool(
+        Tool(
+            name="retryable_tool",
+            function=retryable_tool,
+            description="Fails once and succeeds on retry.",
+            outputs=["value"],
+        )
+    )
+
+    state = {
+        "workflow_id": "retry-test",
+        "iteration": 1,
+
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="retryable_tool",
+                tool_input="run",
+                depends_on=[],
+            )
+        ],
+
+        "context": {},
+        "tool_results": {},
+        "execution_records": [],
+        "completion_status": None,
+        "messages": [],
+        "runtime_config": RuntimeConfig(),
+    }
+
+    # First execution.
+    first_result = executor_node(state)
+
+    assert execution_count == 1
+    assert first_result["tool_results"][1]["success"] is False
+
+    # Persist the failed workflow.
+    save_workflow(
+        "retry-test",
+        state,
+    )
+
+    # Simulate restart.
+    restored = load_workflow(
+        "retry-test",
+    )
+
+    restored["runtime_config"] = RuntimeConfig()
+
+    # Execute again.
+    second_result = executor_node(restored)
+
+    # The failed step must be retried.
+    assert execution_count == 2
+
+    # The retry should succeed.
+    assert second_result["tool_results"][1]["success"] is True
+
+    assert (
+        second_result["tool_results"][1]["output"]["value"]
+        == 42
+    )
+
+    Path(
+        "data/workflows/retry-test.json"
+    ).unlink()
