@@ -558,3 +558,146 @@ def test_parallel_steps_are_checkpointed_correctly():
     Path(
         "data/workflows/parallel-checkpoint-test.json"
     ).unlink() 
+
+def test_restart_reconstructs_runtime_state():
+
+    state = {
+        "workflow_id": "restart-runtime-test",
+        "iteration": 1,
+
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="calculator",
+                tool_input="2+3",
+                depends_on=[],
+            )
+        ],
+
+        "context": {},
+        "tool_results": {},
+        "execution_records": [],
+        "completion_status": None,
+        "messages": [],
+        "runtime_config": RuntimeConfig(),
+    }
+
+    clear_registry()
+    importlib.reload(tools)
+
+    save_workflow(
+        "restart-runtime-test",
+        state,
+    )
+
+    # Simulate a new Python process.
+    restored = load_workflow(
+        "restart-runtime-test",
+    )
+
+    # Runtime objects are reconstructed after restart.
+    restored["runtime_config"] = RuntimeConfig()
+
+    assert restored["workflow_id"] == "restart-runtime-test"
+
+    assert restored["iteration"] == 1
+
+    assert len(restored["steps"]) == 1
+
+    assert restored["steps"][0].tool == "calculator"
+
+    assert isinstance(
+        restored["runtime_config"],
+        RuntimeConfig,
+    )
+
+    # The persisted state should not contain a live
+    # runtime EventBus.
+    assert "event_bus" not in restored
+
+    Path(
+        "data/workflows/restart-runtime-test.json"
+    ).unlink()
+
+def test_restart_resumes_from_persisted_progress():
+
+    state = {
+        "workflow_id": "restart-resume-test",
+        "iteration": 1,
+
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="calculator",
+                tool_input="2+3",
+                depends_on=[],
+            ),
+            PlanStep(
+                id=2,
+                tool="calculator",
+                tool_input="10+20",
+                depends_on=[1],
+            ),
+        ],
+
+        "context": {
+            "step_1": {
+                "value": 5,
+            }
+        },
+
+        "tool_results": {
+            1: {
+                "success": True,
+                "output": {
+                    "value": 5,
+                },
+                "status": StepStatus.SUCCESS,
+                "error": None,
+            }
+        },
+
+        "execution_records": [],
+
+        "completion_status": None,
+
+        "messages": [],
+
+        "runtime_config": RuntimeConfig(),
+    }
+
+    clear_registry()
+    importlib.reload(tools)
+
+    # Process 1: save the partial workflow.
+    save_workflow(
+        "restart-resume-test",
+        state,
+    )
+
+    # Process 2: load the persisted workflow.
+    restored = load_workflow(
+        "restart-resume-test",
+    )
+
+    # Reconstruct runtime-only state.
+    restored["runtime_config"] = RuntimeConfig()
+
+    # Resume execution.
+    result = executor_node(restored)
+
+    # Step 1 was already completed before restart.
+    assert result["tool_results"][1]["success"] is True
+
+    # Step 2 must execute after restart.
+    assert result["tool_results"][2]["success"] is True
+
+    assert (
+        result["tool_results"][2]["output"]["value"]
+        == 30
+    )
+
+    Path(
+        "data/workflows/restart-resume-test.json"
+    ).unlink()
+
