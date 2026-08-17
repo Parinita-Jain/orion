@@ -8,6 +8,8 @@ from models.execution_record import ExecutionRecord
 
 from langchain_core.messages import HumanMessage, AIMessage
 
+from runtime.approval_request import ApprovalRequest
+
 
 def serialize_step(step):
     if is_dataclass(step):
@@ -85,13 +87,28 @@ def deserialize_message(message):
 
 def deserialize_state(data):
 
+    steps = []
+
+    for step in data.get("steps", []):
+
+        approval_data = step.get("approval")
+
+        if approval_data is not None:
+            step["approval"] = ApprovalRequest(
+                **approval_data
+            )
+
+        steps.append(
+            PlanStep(**step)
+        )
+
     return {
         "workflow_id": data["workflow_id"],
         "iteration": data["iteration"],
-        "steps": [
-            PlanStep(**step)
-            for step in data.get("steps", [])
-        ],
+        
+        "steps": steps,
+        # keep your other existing restored fields here
+
         "tool_results": {
             int(step_id): result
             for step_id, result in data.get(

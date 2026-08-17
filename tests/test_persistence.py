@@ -26,6 +26,10 @@ from shared_types.step_status import StepStatus
 
 from registry import Tool, register_tool, clear_registry
 
+from runtime.approval_request import ApprovalRequest
+
+
+
 def test_save_workflow_creates_json():
 
     state = {
@@ -888,3 +892,157 @@ def test_failed_step_is_retried_after_restart():
     Path(
         "data/workflows/retry-test.json"
     ).unlink()
+
+def test_approval_state_survives_restart():
+
+    approval = ApprovalRequest(
+        step_id=2,
+        tool="calculator",
+        reason="This step requires human approval.",
+    )
+
+    state = {
+        "workflow_id": "approval-restart-test",
+        "iteration": 1,
+
+        "steps": [
+            PlanStep(
+                id=2,
+                tool="calculator",
+                tool_input="10+20",
+                depends_on=[],
+                approval=approval,
+            )
+        ],
+
+        "context": {},
+        "tool_results": {},
+        "execution_records": [],
+        "completion_status": None,
+        "messages": [],
+        "runtime_config": RuntimeConfig(),
+    }
+
+    save_workflow(
+        "approval-restart-test",
+        state,
+    )
+
+    restored = load_workflow(
+        "approval-restart-test",
+    )
+
+    restored_approval = restored["steps"][0].approval
+
+    assert restored_approval is not None
+
+    assert restored_approval.step_id == 2
+
+    assert restored_approval.tool == "calculator"
+
+    assert (
+        restored_approval.reason
+        == "This step requires human approval."
+    )
+
+    Path(
+        "data/workflows/approval-restart-test.json"
+    ).unlink()
+
+def test_pending_approval_does_not_execute_after_restart():
+
+    execution_count = 0
+
+    def approval_tool(input_text):
+        nonlocal execution_count
+        execution_count += 1
+
+        return {
+            "messages": [
+                AIMessage(content="Executed")
+            ],
+            "output": {
+                "value": 42
+            },
+            "success": True,
+            "status": StepStatus.SUCCESS,
+            "error": None,
+        }
+
+    clear_registry()
+
+    register_tool(
+        Tool(
+            name="approval_tool",
+            function=approval_tool,
+            description="Tool requiring approval.",
+            outputs=["value"],
+        )
+    )
+
+    approval = ApprovalRequest(
+        step_id=1,
+        tool="approval_tool",
+        reason="Human approval required.",
+    )
+
+    state = {
+        "workflow_id": "approval-resume-test",
+        "iteration": 1,
+
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="approval_tool",
+                tool_input="run",
+                depends_on=[],
+                approval=approval,
+            )
+        ],
+
+        "context": {},
+        "tool_results": {},
+        "execution_records": [],
+        "completion_status": None,
+        "messages": [],
+        "runtime_config": RuntimeConfig(),
+    }
+
+    # First execution: approval should be required.
+    result = executor_node(state)
+
+    assert execution_count == 0
+
+    assert (
+        result["tool_results"][1]["status"]
+        == StepStatus.WAITING_FOR_APPROVAL
+    )
+
+    # Persist the pending-approval workflow.
+    save_workflow(
+        "approval-resume-test",
+        state,
+    )
+
+    # Simulate restart.
+    restored = load_workflow(
+        "approval-resume-test",
+    )
+
+    restored["runtime_config"] = RuntimeConfig()
+
+    # Resume without providing an approval decision.
+    result = executor_node(restored)
+
+    # Tool must still NOT execute.
+    assert execution_count == 0
+
+    assert (
+        result["tool_results"][1]["status"]
+        == StepStatus.WAITING_FOR_APPROVAL
+    )
+
+    Path(
+        "data/workflows/approval-resume-test.json"
+    ).unlink()
+
