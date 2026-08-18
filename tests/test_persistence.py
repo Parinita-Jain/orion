@@ -2249,3 +2249,65 @@ def test_replacement_step_survives_restart(mock_llm):
     Path(
         "data/workflows/replacement-restart-test.json"
     ).unlink()
+
+def test_replanner_iteration_survives_restart():
+
+    state = {
+        "workflow_id": "iteration-restart-test",
+        "iteration": 2,
+
+        "messages": [
+            HumanMessage(
+                content="Continue the workflow."
+            )
+        ],
+
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="first_tool",
+                tool_input="run",
+                depends_on=[],
+            )
+        ],
+
+        "context": {},
+
+        "tool_results": {
+            1: {
+                "messages": [],
+                "output": {
+                    "value": 42,
+                },
+                "success": True,
+                "status": StepStatus.SUCCESS,
+                "error": None,
+                "failure_reason": None,
+            }
+        },
+
+        "execution_records": [],
+
+        "completion_status": CompletionStatus.REPLAN,
+
+        "runtime_config": RuntimeConfig(),
+    }
+
+    save_workflow(
+        "iteration-restart-test",
+        state,
+    )
+
+    # Simulate restart.
+    restored = load_workflow(
+        "iteration-restart-test",
+    )
+
+    restored["runtime_config"] = RuntimeConfig()
+
+    # The replan iteration must survive persistence.
+    assert restored["iteration"] == 2
+
+    Path(
+        "data/workflows/iteration-restart-test.json"
+    ).unlink()
