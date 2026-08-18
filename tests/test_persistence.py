@@ -32,6 +32,10 @@ from runtime.approval_decision import ApprovalDecision
 
 from workflow.completion import completion_node
 
+from schemas import ReplannerOutput
+from replanner import replanner_node
+from schemas import PlanStep as ReplannerPlanStep
+
 def test_save_workflow_creates_json():
 
     state = {
@@ -1966,3 +1970,282 @@ def test_approval_rejection_after_restart_skips_dependent_step():
         "data/workflows/approval-rejection-restart-test.json"
     ).unlink()    
 
+@patch("replanner.llm")
+def test_replacement_step_survives_restart(mock_llm):
+
+    execution_counts = {
+        "step_1": 0,
+        "step_2": 0,
+        "step_3": 0,
+    }
+
+
+    def first_tool(input_text):
+        execution_counts["step_1"] += 1
+
+        return {
+            "messages": [
+                AIMessage(content="Step 1 executed")
+            ],
+            "output": {
+                "answer": "RAG explanation",
+            },
+            "success": True,
+            "status": StepStatus.SUCCESS,
+            "error": None,
+            "failure_reason": None,
+        }
+
+    def replacement_tool(input_text):
+        execution_counts["step_3"] += 1
+
+        return {
+            "messages": [
+                AIMessage(content="Replacement executed")
+            ],
+            "output": {
+                "answer": "Final answer",
+            },
+            "success": True,
+            "status": StepStatus.SUCCESS,
+            "error": None,
+            "failure_reason": None,
+        }
+
+    def original_tool(input_text):
+        execution_counts["step_2"] += 1
+
+        return {
+            "messages": [
+                AIMessage(content="Original step executed")
+            ],
+            "output": {
+                "answer": "Original result",
+            },
+            "success": True,
+            "status": StepStatus.SUCCESS,
+            "error": None,
+            "failure_reason": None,
+        }
+
+    clear_registry()
+
+    register_tool(
+        Tool(
+            name="first_tool",
+            function=first_tool,
+            description="First successful step.",
+            outputs=["answer"],
+        )
+    )
+
+    register_tool(
+        Tool(
+            name="replacement_tool",
+            function=replacement_tool,
+            description="Replacement step.",
+            outputs=["answer"],
+        )
+    )
+
+    register_tool(
+        Tool(
+            name="original_tool",
+            function=original_tool,
+            description="Original failed step.",
+            outputs=["answer"],
+        )
+    )
+
+    class FakeLLM:
+
+        def invoke(self, prompt):
+
+            return ReplannerOutput(
+                done=False,
+                steps=[
+                    ReplannerPlanStep(
+                        id=3,
+                        tool="replacement_tool",
+                        tool_input="Retry Step 2",
+                        depends_on=[1],
+                        replaces=2,
+                    )
+                ],
+            )
+
+    mock_llm.with_structured_output.return_value = FakeLLM()
+
+    # --------------------------------------------------
+    # Initial state contains ONLY Step 1.
+    # --------------------------------------------------
+
+    state = {
+        "workflow_id": "replacement-restart-test",
+        "iteration": 0,
+
+        "messages": [
+            HumanMessage(
+                content="Explain RAG and summarize it."
+            )
+        ],
+
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="first_tool",
+                tool_input="Explain RAG",
+                depends_on=[],
+            ),
+        ],
+
+        "context": {},
+        "tool_results": {},
+        "execution_records": [],
+        "completion_status": None,
+        "runtime_config": RuntimeConfig(),
+    }
+
+    # --------------------------------------------------
+    # Actually execute Step 1.
+    # --------------------------------------------------
+
+    result = executor_node(state)
+
+    assert execution_counts["step_1"] == 1
+
+    assert (
+        result["tool_results"][1]["status"]
+        == StepStatus.SUCCESS
+    )
+
+    state.update(result)
+
+    # --------------------------------------------------
+    # Simulate Step 2 having failed before restart.
+    # --------------------------------------------------
+
+    state["steps"].append(
+        PlanStep(
+            id=2,
+            tool="original_tool",
+            tool_input="Summarize",
+            depends_on=[1],
+        )
+    )
+
+    state["tool_results"][2] = {
+        "messages": [],
+        "output": {},
+        "success": False,
+        "status": StepStatus.FAILED,
+        "error": "Timeout",
+        "failure_reason": FailureReason.TIMEOUT,
+    }
+
+    state["completion_status"] = (
+        CompletionStatus.REPLAN
+    )
+
+    # --------------------------------------------------
+    # Replanner creates replacement Step 3.
+    # --------------------------------------------------
+
+    replanner_result = replanner_node(state)
+
+    assert replanner_result["error"] is None
+    assert replanner_result["done"] is False
+    assert replanner_result["iteration"] == 1
+
+    assert len(replanner_result["steps"]) == 3
+
+    replacement = replanner_result["steps"][-1]
+
+    assert replacement.id == 3
+    assert replacement.replaces == 2
+
+    state["steps"] = replanner_result["steps"]
+    state["iteration"] = replanner_result["iteration"]
+
+    # --------------------------------------------------
+    # Persist after replanning.
+    # --------------------------------------------------
+
+    save_workflow(
+        "replacement-restart-test",
+        state,
+    )
+
+    # --------------------------------------------------
+    # Simulate process restart.
+    # --------------------------------------------------
+
+    restored = load_workflow(
+        "replacement-restart-test",
+    )
+
+    restored["runtime_config"] = RuntimeConfig()
+
+    # --------------------------------------------------
+    # Verify Step 1 survived as completed.
+    # --------------------------------------------------
+
+    assert (
+        restored["tool_results"][1]["status"]
+        == StepStatus.SUCCESS
+    )
+
+    # --------------------------------------------------
+    # Verify failed Step 2 survived.
+    # --------------------------------------------------
+
+    assert (
+        restored["tool_results"][2]["status"]
+        == StepStatus.FAILED
+    )
+
+    assert (
+        restored["tool_results"][2]["failure_reason"]
+        == FailureReason.TIMEOUT
+    )
+
+    # --------------------------------------------------
+    # Verify replacement Step 3 survived.
+    # --------------------------------------------------
+
+    restored_replacement = restored["steps"][-1]
+
+    assert restored_replacement.id == 3
+
+    assert restored_replacement.replaces == 2
+
+    # --------------------------------------------------
+    # Execute after restart.
+    # --------------------------------------------------
+
+    result = executor_node(restored)
+
+    # Step 1 must NOT execute again.
+    assert execution_counts["step_1"] == 1
+
+    # Replacement Step 3 must execute.
+    assert execution_counts["step_3"] == 1
+
+    # original tool processed once
+    assert execution_counts["step_2"] == 1
+
+    # Original Step 2 must be superseded.
+    assert (
+        result["tool_results"][2]["status"]
+        == StepStatus.SUPERSEDED
+    )
+
+    # Replacement Step 3 must succeed.
+    assert (
+        result["tool_results"][3]["status"]
+        == StepStatus.SUCCESS
+    )
+
+    Path(
+        "data/workflows/replacement-restart-test.json"
+    ).unlink()
