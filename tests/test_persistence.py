@@ -2466,3 +2466,81 @@ def test_messages_survive_restart():
     Path(
         "data/workflows/messages-restart-test.json"
     ).unlink()
+
+def test_execution_records_survive_restart():
+
+    state = {
+        "workflow_id": "execution-records-restart-test",
+        "iteration": 0,
+
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="calculator",
+                tool_input="2+3",
+                depends_on=[],
+            )
+        ],
+
+        "context": {},
+
+        "tool_results": {
+            1: {
+                "messages": [],
+                "output": {
+                    "value": 5,
+                },
+                "success": True,
+                "status": StepStatus.SUCCESS,
+                "error": None,
+                "failure_reason": None,
+            }
+        },
+
+        "execution_records": [
+            ExecutionRecord(
+                step_id=1,
+                tool="calculator",
+                success=True,
+                retries=0,
+                start_time=10.0,
+                end_time=10.5,
+                duration=0.5,
+                error=None,
+            )
+        ],
+
+        "completion_status": CompletionStatus.COMPLETE,
+
+        "messages": [],
+
+        "runtime_config": RuntimeConfig(),
+    }
+
+    save_workflow(
+        "execution-records-restart-test",
+        state,
+    )
+
+    restored = load_workflow(
+        "execution-records-restart-test",
+    )
+
+    restored["runtime_config"] = RuntimeConfig()
+
+    assert len(restored["execution_records"]) == 1
+
+    record = restored["execution_records"][0]
+
+    assert record.step_id == 1
+    assert record.tool == "calculator"
+    assert record.success is True
+    assert record.retries == 0
+    assert record.start_time == 10.0
+    assert record.end_time == 10.5
+    assert record.duration == 0.5
+    assert record.error is None
+
+    Path(
+        "data/workflows/execution-records-restart-test.json"
+    ).unlink()
