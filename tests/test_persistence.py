@@ -1464,3 +1464,137 @@ def test_successful_step_is_not_reexecuted_when_later_step_retries_after_restart
     Path(
         "data/workflows/failed-dependent-restart-test.json"
     ).unlink()
+
+def test_condition_skipped_step_is_not_reexecuted_after_restart():
+
+    execution_counts = {
+        "check": 0,
+        "approve": 0,
+    }
+
+    def check_tool(input_text):
+        execution_counts["check"] += 1
+
+        return {
+            "messages": [
+                AIMessage(content="Not eligible")
+            ],
+            "output": {
+                "answer": "not eligible",
+            },
+            "success": True,
+            "status": StepStatus.SUCCESS,
+            "error": None,
+        }
+
+    def approve_tool(input_text):
+        execution_counts["approve"] += 1
+
+        return {
+            "messages": [
+                AIMessage(content="Approved")
+            ],
+            "output": {
+                "answer": "approved",
+            },
+            "success": True,
+            "status": StepStatus.SUCCESS,
+            "error": None,
+        }
+
+    clear_registry()
+
+    register_tool(
+        Tool(
+            name="check",
+            function=check_tool,
+            description="Eligibility check.",
+            outputs=["answer"],
+        )
+    )
+
+    register_tool(
+        Tool(
+            name="approve",
+            function=approve_tool,
+            description="Approval step.",
+            outputs=["answer"],
+        )
+    )
+
+    state = {
+        "workflow_id": "conditional-skip-restart-test",
+        "iteration": 1,
+
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="check",
+                tool_input="Check eligibility",
+                depends_on=[],
+            ),
+            PlanStep(
+                id=2,
+                tool="approve",
+                tool_input="Approve",
+                depends_on=[1],
+                condition="#1.answer == 'eligible'",
+            ),
+        ],
+
+        "context": {},
+        "tool_results": {},
+        "execution_records": [],
+        "completion_status": None,
+        "messages": [],
+        "runtime_config": RuntimeConfig(),
+    }
+
+    # First execution.
+    result = executor_node(state)
+
+    # Step 1 executed.
+    assert execution_counts["check"] == 1
+
+    # Step 2 must NOT execute because the condition is false.
+    assert execution_counts["approve"] == 0
+
+    assert (
+        result["tool_results"][2]["status"]
+        == StepStatus.SKIPPED
+    )
+
+    # Conditional skip is considered successful/terminal.
+    assert (
+        result["tool_results"][2]["success"]
+        is True
+    )
+
+    # Persist the completed workflow.
+    save_workflow(
+        "conditional-skip-restart-test",
+        state,
+    )
+
+    # Simulate restart.
+    restored = load_workflow(
+        "conditional-skip-restart-test",
+    )
+
+    restored["runtime_config"] = RuntimeConfig()
+
+    result = executor_node(restored)
+
+    # Neither step should execute again.
+    assert execution_counts["check"] == 1
+    assert execution_counts["approve"] == 0
+
+    # The skipped state must survive restart.
+    assert (
+        result["tool_results"][2]["status"]
+        == StepStatus.SKIPPED
+    )
+
+    Path(
+        "data/workflows/conditional-skip-restart-test.json"
+    ).unlink()
