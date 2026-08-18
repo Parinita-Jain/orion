@@ -2403,3 +2403,66 @@ def test_context_survives_restart():
     Path(
         "data/workflows/context-restart-test.json"
     ).unlink()
+
+def test_messages_survive_restart():
+
+    state = {
+        "workflow_id": "messages-restart-test",
+        "iteration": 0,
+
+        "steps": [],
+
+        "context": {},
+        "tool_results": {},
+        "execution_records": [],
+
+        "completion_status": None,
+
+        "messages": [
+            HumanMessage(
+                content="Explain RAG and summarize the answer."
+            ),
+            AIMessage(
+                content="I will explain RAG first."
+            ),
+        ],
+
+        "runtime_config": RuntimeConfig(),
+    }
+
+    save_workflow(
+        "messages-restart-test",
+        state,
+    )
+
+    restored = load_workflow(
+        "messages-restart-test",
+    )
+
+    restored["runtime_config"] = RuntimeConfig()
+
+    assert len(restored["messages"]) == 2
+
+    assert isinstance(
+        restored["messages"][0],
+        HumanMessage,
+    )
+
+    assert (
+        restored["messages"][0].content
+        == "Explain RAG and summarize the answer."
+    )
+
+    assert isinstance(
+        restored["messages"][1],
+        AIMessage,
+    )
+
+    assert (
+        restored["messages"][1].content
+        == "I will explain RAG first."
+    )
+
+    Path(
+        "data/workflows/messages-restart-test.json"
+    ).unlink()
