@@ -23,6 +23,7 @@ from runtime.runtime_config import RuntimeConfig
 from models.plan import PlanStep
 
 from shared_types.step_status import StepStatus
+from shared_types.failure_reason import FailureReason
 
 from registry import Tool, register_tool, clear_registry
 
@@ -1319,4 +1320,147 @@ def test_restart_executes_only_remaining_dependent_steps():
 
     Path(
         "data/workflows/dependency-restart-test.json"
+    ).unlink()
+
+def test_successful_step_is_not_reexecuted_when_later_step_retries_after_restart():
+
+    execution_counts = {
+        "step_1": 0,
+        "step_2": 0,
+    }
+
+    def first_tool(input_text):
+        execution_counts["step_1"] += 1
+
+        return {
+            "messages": [
+                AIMessage(content="Step 1 executed")
+            ],
+            "output": {
+                "value": 5,
+            },
+            "success": True,
+            "status": StepStatus.SUCCESS,
+            "error": None,
+        }
+
+    def second_tool(input_text):
+        execution_counts["step_2"] += 1
+
+        if execution_counts["step_2"] == 1:
+            return {
+                "messages": [
+                    AIMessage(content="Temporary failure")
+                ],
+                "output": {},
+                "success": False,
+                "status": StepStatus.FAILED,
+                "failure_reason": FailureReason.EXCEPTION,
+                "error": "Temporary failure",
+            }
+
+        return {
+            "messages": [
+                AIMessage(content="Step 2 succeeded")
+            ],
+            "output": {
+                "value": 30,
+            },
+            "success": True,
+            "status": StepStatus.SUCCESS,
+            "error": None,
+        }
+
+    clear_registry()
+
+    register_tool(
+        Tool(
+            name="first_tool",
+            function=first_tool,
+            description="First successful step.",
+            outputs=["value"],
+        )
+    )
+
+    register_tool(
+        Tool(
+            name="second_tool",
+            function=second_tool,
+            description="Retryable second step.",
+            outputs=["value"],
+        )
+    )
+
+    state = {
+        "workflow_id": "failed-dependent-restart-test",
+        "iteration": 1,
+
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="first_tool",
+                tool_input="2+3",
+                depends_on=[],
+            ),
+            PlanStep(
+                id=2,
+                tool="second_tool",
+                tool_input="use step 1",
+                depends_on=[1],
+            ),
+        ],
+
+        "context": {},
+        "tool_results": {},
+        "execution_records": [],
+        "completion_status": None,
+        "messages": [],
+        "runtime_config": RuntimeConfig(),
+    }
+
+    result = executor_node(state)
+
+    # Step 1 succeeds once.
+    assert execution_counts["step_1"] == 1
+
+    # Step 2 runs once and fails.
+    assert execution_counts["step_2"] == 1
+    assert (
+        result["tool_results"][2]["status"]
+        == StepStatus.FAILED
+    )
+
+    # Step 1's successful result must remain available.
+    assert (
+        state["tool_results"][1]["status"]
+        == StepStatus.SUCCESS
+    )
+
+    save_workflow(
+        "failed-dependent-restart-test",
+        state,
+    )
+
+    restored = load_workflow(
+        "failed-dependent-restart-test"
+    )
+
+    restored["runtime_config"] = RuntimeConfig()
+
+    # Restart.
+    result = executor_node(restored)
+
+    # Successful Step 1 must NOT execute again.
+    assert execution_counts["step_1"] == 1
+
+    # Failed Step 2 must retry.
+    assert execution_counts["step_2"] == 2
+
+    assert (
+        result["tool_results"][2]["success"]
+        is True
+    )
+
+    Path(
+        "data/workflows/failed-dependent-restart-test.json"
     ).unlink()
