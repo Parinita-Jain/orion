@@ -2311,3 +2311,95 @@ def test_replanner_iteration_survives_restart():
     Path(
         "data/workflows/iteration-restart-test.json"
     ).unlink()
+
+def test_context_survives_restart():
+
+    def context_tool(input_text):
+
+        return {
+            "messages": [
+                AIMessage(content="Context created")
+            ],
+            "output": {
+                "answer": "RAG explanation",
+            },
+            "success": True,
+            "status": StepStatus.SUCCESS,
+            "error": None,
+            "failure_reason": None,
+        }
+
+    clear_registry()
+
+    register_tool(
+        Tool(
+            name="context_tool",
+            function=context_tool,
+            description="Creates context for downstream steps.",
+            outputs=["answer"],
+        )
+    )
+
+    state = {
+        "workflow_id": "context-restart-test",
+        "iteration": 0,
+
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="context_tool",
+                tool_input="Explain RAG",
+                depends_on=[],
+            )
+        ],
+
+        "context": {},
+        "tool_results": {},
+        "execution_records": [],
+        "completion_status": None,
+        "messages": [],
+        "runtime_config": RuntimeConfig(),
+    }
+
+    # Execute Step 1.
+    result = executor_node(state)
+
+    assert (
+        result["tool_results"][1]["status"]
+        == StepStatus.SUCCESS
+    )
+
+    # The executor should have created the context entry.
+    assert "step_1" in result["context"]
+
+    assert (
+        result["context"]["step_1"]["answer"]
+        == "RAG explanation"
+    )
+
+    state.update(result)
+
+    # Persist.
+    save_workflow(
+        "context-restart-test",
+        state,
+    )
+
+    # Simulate restart.
+    restored = load_workflow(
+        "context-restart-test",
+    )
+
+    restored["runtime_config"] = RuntimeConfig()
+
+    # Context must survive restart.
+    assert "step_1" in restored["context"]
+
+    assert (
+        restored["context"]["step_1"]["answer"]
+        == "RAG explanation"
+    )
+
+    Path(
+        "data/workflows/context-restart-test.json"
+    ).unlink()
