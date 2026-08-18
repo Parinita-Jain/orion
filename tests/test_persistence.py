@@ -28,6 +28,7 @@ from shared_types.failure_reason import FailureReason
 from registry import Tool, register_tool, clear_registry
 
 from runtime.approval_request import ApprovalRequest
+from runtime.approval_decision import ApprovalDecision
 
 from workflow.completion import completion_node
 
@@ -1598,3 +1599,181 @@ def test_condition_skipped_step_is_not_reexecuted_after_restart():
     Path(
         "data/workflows/conditional-skip-restart-test.json"
     ).unlink()
+
+def test_waiting_approval_dependency_survives_restart():
+
+    execution_counts = {
+        "step_1": 0,
+        "step_2": 0,
+    }
+
+    def first_tool(input_text):
+        execution_counts["step_1"] += 1
+
+        return {
+            "messages": [
+                AIMessage(content="Step 1 executed")
+            ],
+            "output": {
+                "value": 5,
+            },
+            "success": True,
+            "status": StepStatus.SUCCESS,
+            "error": None,
+        }
+
+    def second_tool(input_text):
+        execution_counts["step_2"] += 1
+
+        return {
+            "messages": [
+                AIMessage(content="Step 2 executed")
+            ],
+            "output": {
+                "value": 30,
+            },
+            "success": True,
+            "status": StepStatus.SUCCESS,
+            "error": None,
+        }
+
+    clear_registry()
+
+    register_tool(
+        Tool(
+            name="first_tool",
+            function=first_tool,
+            description="First dependency step.",
+            outputs=["value"],
+        )
+    )
+
+    register_tool(
+        Tool(
+            name="second_tool",
+            function=second_tool,
+            description="Approval-protected second step.",
+            outputs=["value"],
+        )
+    )
+
+    approval = ApprovalRequest(
+        step_id=2,
+        tool="second_tool",
+        reason="Human approval required.",
+    )
+
+    state = {
+        "workflow_id": "approval-dependent-restart-test",
+        "iteration": 1,
+
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="first_tool",
+                tool_input="2+3",
+                depends_on=[],
+            ),
+            PlanStep(
+                id=2,
+                tool="second_tool",
+                tool_input="use step 1",
+                depends_on=[1],
+                approval=approval,
+            ),
+        ],
+
+        "context": {},
+        "tool_results": {},
+        "execution_records": [],
+        "completion_status": None,
+        "messages": [],
+        "runtime_config": RuntimeConfig(),
+    }
+
+    # First execution.
+    result = executor_node(state)
+
+    # Step 1 executes.
+    assert execution_counts["step_1"] == 1
+
+    # Step 2 must wait for approval.
+    assert execution_counts["step_2"] == 0
+
+    assert (
+        result["tool_results"][2]["status"]
+        == StepStatus.WAITING_FOR_APPROVAL
+    )
+
+    # Approval request should exist.
+    assert result["approval_request"] is not None
+
+    # Persist the waiting state.
+    save_workflow(
+        "approval-dependent-restart-test",
+        state,
+    )
+
+    # Simulate restart.
+    restored = load_workflow(
+        "approval-dependent-restart-test",
+    )
+
+    restored["runtime_config"] = RuntimeConfig()
+
+    # Resume without an approval decision.
+    result = executor_node(restored)
+
+    # Step 1 must not execute again.
+    assert execution_counts["step_1"] == 1
+
+    # Step 2 must still wait.
+    assert execution_counts["step_2"] == 0
+
+    assert (
+        result["tool_results"][2]["status"]
+        == StepStatus.WAITING_FOR_APPROVAL
+    )
+
+    assert result["approval_request"] is not None
+
+    result = executor_node(restored)
+
+    assert execution_counts["step_1"] == 1
+    assert execution_counts["step_2"] == 0
+
+    assert (
+        result["tool_results"][2]["status"]
+        == StepStatus.WAITING_FOR_APPROVAL
+    )
+
+    assert result["approval_request"] is not None
+
+
+    # Grant approval after restart.
+    restored.update(result)
+
+    restored["approval_decision"] = (
+        ApprovalDecision.APPROVED
+    )
+
+    result = executor_node(restored)
+
+    # Step 1 must NOT execute again.
+    assert execution_counts["step_1"] == 1
+
+    # Step 2 should execute after approval.
+    assert execution_counts["step_2"] == 1
+
+    assert (
+        result["tool_results"][2]["status"]
+        == StepStatus.SUCCESS
+    )
+
+
+    Path(
+        "data/workflows/approval-dependent-restart-test.json"
+    ).unlink()
+
+    
+
