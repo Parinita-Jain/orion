@@ -3,6 +3,7 @@ import json
 
 import importlib
 
+import pytest
 
 from registry import clear_registry
 
@@ -2742,3 +2743,91 @@ def test_replan_status_survives_restart():
     Path(
         "data/workflows/replan-status-restart-test.json"
     ).unlink()
+
+
+
+def test_write_failure_does_not_corrupt_previous_checkpoint(
+    monkeypatch,
+):
+    workflow_id = "atomic-write-failure-test"
+
+    original_state = {
+        "workflow_id": workflow_id,
+        "iteration": 1,
+        "steps": [],
+        "context": {
+            "answer": "original checkpoint",
+        },
+        "tool_results": {},
+        "execution_records": [],
+        "completion_status": None,
+        "messages": [],
+        "runtime_config": RuntimeConfig(),
+    }
+
+    # ---------------------------------
+    # Create a valid checkpoint first.
+    # ---------------------------------
+
+    save_workflow(
+        workflow_id,
+        original_state,
+    )
+
+    updated_state = {
+        **original_state,
+        "iteration": 2,
+        "context": {
+            "answer": "new checkpoint",
+        },
+    }
+
+    # ---------------------------------
+    # Make json.dump() fail.
+    # ---------------------------------
+
+    def failing_dump(*args, **kwargs):
+        raise OSError(
+            "Simulated write failure"
+        )
+
+    monkeypatch.setattr(
+        "persistence.store.json.dump",
+        failing_dump,
+    )
+
+    # ---------------------------------
+    # The new save must fail.
+    # ---------------------------------
+
+    with pytest.raises(OSError):
+
+        save_workflow(
+            workflow_id,
+            updated_state,
+        )
+
+    # ---------------------------------
+    # The previous checkpoint must
+    # STILL be completely recoverable.
+    # ---------------------------------
+
+    restored = load_workflow(
+        workflow_id,
+    )
+
+    assert restored["iteration"] == 1
+
+    assert (
+        restored["context"]["answer"]
+        == "original checkpoint"
+    )
+
+    # ---------------------------------
+    # Cleanup
+    # ---------------------------------
+
+    Path(
+        f"data/workflows/{workflow_id}.json"
+    ).unlink()
+
