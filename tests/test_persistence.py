@@ -2831,3 +2831,83 @@ def test_write_failure_does_not_corrupt_previous_checkpoint(
         f"data/workflows/{workflow_id}.json"
     ).unlink()
 
+def test_load_workflow_raises_on_corrupted_checkpoint():
+
+    workflow_id = "corrupted-checkpoint-test"
+
+    path = Path(
+        f"data/workflows/{workflow_id}.json"
+    )
+
+    path.write_text(
+        '{"workflow_id": "corrupted"',
+        encoding="utf-8",
+    )
+
+    try:
+
+        with pytest.raises(json.JSONDecodeError):
+
+            load_workflow(workflow_id)
+
+    finally:
+
+        if path.exists():
+            path.unlink()
+
+def test_successful_atomic_save_replaces_previous_checkpoint():
+
+    workflow_id = "atomic-replace-test"
+
+    original_state = {
+        "workflow_id": workflow_id,
+        "iteration": 1,
+        "steps": [],
+        "context": {
+            "answer": "original",
+        },
+        "tool_results": {},
+        "execution_records": [],
+        "completion_status": None,
+        "messages": [],
+        "runtime_config": RuntimeConfig(),
+    }
+
+    updated_state = {
+        **original_state,
+        "iteration": 2,
+        "context": {
+            "answer": "updated",
+        },
+    }
+
+    try:
+        save_workflow(
+            workflow_id,
+            original_state,
+        )
+
+        save_workflow(
+            workflow_id,
+            updated_state,
+        )
+
+        restored = load_workflow(
+            workflow_id,
+        )
+
+        assert restored["iteration"] == 2
+
+        assert (
+            restored["context"]["answer"]
+            == "updated"
+        )
+
+    finally:
+        path = Path(
+            f"data/workflows/{workflow_id}.json"
+        )
+
+        if path.exists():
+            path.unlink()
+
