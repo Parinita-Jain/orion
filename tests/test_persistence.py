@@ -2544,3 +2544,70 @@ def test_execution_records_survive_restart():
     Path(
         "data/workflows/execution-records-restart-test.json"
     ).unlink()
+
+
+def test_approval_request_survives_restart():
+
+    approval = ApprovalRequest(
+        step_id=1,
+        tool="approval_tool",
+        reason="Requires manual approval",
+    )
+
+    state = {
+        "workflow_id": "approval-request-restart-test",
+        "iteration": 0,
+
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="approval_tool",
+                tool_input="Approve this action",
+                depends_on=[],
+                approval=approval,
+            )
+        ],
+
+        "context": {},
+        "tool_results": {},
+        "execution_records": [],
+
+        "completion_status": None,
+
+        "messages": [],
+
+        "runtime_config": RuntimeConfig(),
+    }
+
+    save_workflow(
+        "approval-request-restart-test",
+        state,
+    )
+
+    restored = load_workflow(
+        "approval-request-restart-test",
+    )
+
+    restored_step = restored["steps"][0]
+
+    assert restored_step.approval is not None
+
+    assert (
+        restored_step.approval.step_id
+        == 1
+    )
+
+    assert (
+        restored_step.approval.tool
+        == "approval_tool"
+    )
+
+    assert (
+        restored_step.approval.reason
+        == "Requires manual approval"
+    )
+
+    Path(
+        "data/workflows/approval-request-restart-test.json"
+    ).unlink()
+
