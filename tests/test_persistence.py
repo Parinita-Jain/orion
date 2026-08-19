@@ -2677,3 +2677,68 @@ def test_failure_reason_survives_restart():
     Path(
         "data/workflows/failure-reason-restart-test.json"
     ).unlink()
+
+def test_replan_status_survives_restart():
+
+    state = {
+        "workflow_id": "replan-status-restart-test",
+        "iteration": 1,
+
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="temporary_tool",
+                tool_input="run",
+                depends_on=[],
+            )
+        ],
+
+        "context": {},
+
+        "tool_results": {
+            1: {
+                "messages": [],
+                "output": {},
+                "success": False,
+                "status": StepStatus.FAILED,
+                "error": "Request timed out",
+                "failure_reason": FailureReason.TIMEOUT,
+            }
+        },
+
+        "execution_records": [],
+
+        "completion_status": CompletionStatus.REPLAN,
+
+        "messages": [],
+
+        "runtime_config": RuntimeConfig(),
+    }
+
+    save_workflow(
+        "replan-status-restart-test",
+        state,
+    )
+
+    restored = load_workflow(
+        "replan-status-restart-test",
+    )
+
+    assert (
+        restored["completion_status"]
+        == CompletionStatus.REPLAN
+    )
+
+    assert (
+        restored["tool_results"][1]["failure_reason"]
+        == FailureReason.TIMEOUT
+    )
+
+    assert (
+        restored["tool_results"][1]["status"]
+        == StepStatus.FAILED
+    )
+
+    Path(
+        "data/workflows/replan-status-restart-test.json"
+    ).unlink()
