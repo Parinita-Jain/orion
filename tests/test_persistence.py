@@ -2611,3 +2611,69 @@ def test_approval_request_survives_restart():
         "data/workflows/approval-request-restart-test.json"
     ).unlink()
 
+def test_failure_reason_survives_restart():
+
+    state = {
+        "workflow_id": "failure-reason-restart-test",
+        "iteration": 0,
+
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="temporary_tool",
+                tool_input="run",
+                depends_on=[],
+            )
+        ],
+
+        "context": {},
+
+        "tool_results": {
+            1: {
+                "messages": [],
+                "output": {},
+                "success": False,
+                "status": StepStatus.FAILED,
+                "error": "Request timed out",
+                "failure_reason": FailureReason.TIMEOUT,
+            }
+        },
+
+        "execution_records": [],
+
+        "completion_status": CompletionStatus.REPLAN,
+
+        "messages": [],
+
+        "runtime_config": RuntimeConfig(),
+    }
+
+    save_workflow(
+        "failure-reason-restart-test",
+        state,
+    )
+
+    restored = load_workflow(
+        "failure-reason-restart-test",
+    )
+
+    restored_result = restored["tool_results"][1]
+
+    assert (
+        restored_result["status"]
+        == StepStatus.FAILED
+    )
+
+    assert (
+        restored_result["failure_reason"]
+        == FailureReason.TIMEOUT
+    )
+
+    assert (
+        restored_result["error"]
+        == "Request timed out"
+    )
+
+    Path(
+        "data/workflows/failure-reason-restart-test.json"
+    ).unlink()
