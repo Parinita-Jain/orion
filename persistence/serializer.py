@@ -72,6 +72,7 @@ def serialize_state(state):
             for message in state.get("messages", [])
         ],
         "context": state.get("context", {}),
+        "output": state.get("output", {}),
     }
 
 def deserialize_message(message):
@@ -130,4 +131,6 @@ def deserialize_state(data):
             for message in data.get("messages", [])
         ],
         "context": data.get("context", {}),
+        "output": data.get("output", {}),
     }
+

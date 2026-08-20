@@ -2925,3 +2925,96 @@ def test_load_workflow_raises_when_workflow_does_not_exist():
     with pytest.raises(FileNotFoundError):
 
         load_workflow(workflow_id)
+
+def test_output_survives_restart():
+
+    workflow_id = "output-restart-test"
+
+    state = {
+        "workflow_id": workflow_id,
+        "iteration": 0,
+
+        "steps": [],
+
+        "context": {},
+
+        "output": {
+            "answer": "Final RAG answer",
+            "confidence": 0.95,
+        },
+
+        "tool_results": {},
+        "execution_records": [],
+
+        "completion_status": None,
+
+        "messages": [],
+
+        "runtime_config": RuntimeConfig(),
+    }
+
+    try:
+        save_workflow(
+            workflow_id,
+            state,
+        )
+
+        restored = load_workflow(
+            workflow_id,
+        )
+
+        assert "output" in restored
+
+        assert restored["output"] == {
+            "answer": "Final RAG answer",
+            "confidence": 0.95,
+        }
+
+    finally:
+        path = Path(
+            f"data/workflows/{workflow_id}.json"
+        )
+
+        if path.exists():
+            path.unlink()
+
+def test_old_checkpoint_without_output_still_loads():
+
+    workflow_id = "legacy-output-restart-test"
+
+    legacy_state = {
+        "workflow_id": workflow_id,
+        "iteration": 1,
+        "steps": [],
+        "tool_results": {},
+        "execution_records": [],
+        "completion_status": None,
+        "messages": [],
+        "context": {
+            "answer": "legacy checkpoint",
+        },
+    }
+
+    path = Path(
+        f"data/workflows/{workflow_id}.json"
+    )
+
+    try:
+        path.write_text(
+            json.dumps(legacy_state),
+            encoding="utf-8",
+        )
+
+        restored = load_workflow(
+            workflow_id,
+        )
+
+        assert restored["context"]["answer"] == (
+            "legacy checkpoint"
+        )
+
+        assert restored["output"] == {}
+
+    finally:
+        if path.exists():
+            path.unlink()
