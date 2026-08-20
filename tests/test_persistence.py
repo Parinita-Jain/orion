@@ -37,6 +37,8 @@ from schemas import ReplannerOutput
 from replanner import replanner_node
 from schemas import PlanStep as ReplannerPlanStep
 
+from errors import OrionError, ErrorType
+
 def test_save_workflow_creates_json():
 
     state = {
@@ -3100,6 +3102,119 @@ def test_old_checkpoint_without_done_still_loads():
         )
 
         assert restored["done"] is False
+
+    finally:
+        if path.exists():
+            path.unlink()
+
+def test_error_survives_restart():
+
+    workflow_id = "error-restart-test"
+
+    error = OrionError(
+        error_type=ErrorType.INFRASTRUCTURE,
+        message="Planner LLM failed",
+        recoverable=True,
+        source="planner",
+    )
+
+    state = {
+        "workflow_id": workflow_id,
+        "iteration": 1,
+
+        "steps": [],
+
+        "context": {},
+        "output": {},
+
+        "tool_results": {},
+        "execution_records": [],
+
+        "completion_status": None,
+
+        "messages": [],
+
+        "done": True,
+
+        "error": error,
+
+        "runtime_config": RuntimeConfig(),
+    }
+
+    try:
+        save_workflow(
+            workflow_id,
+            state,
+        )
+
+        restored = load_workflow(
+            workflow_id,
+        )
+
+        assert "error" in restored
+        assert restored["error"] is not None
+
+        assert (
+            restored["error"].error_type
+            == ErrorType.INFRASTRUCTURE
+        )
+
+        assert (
+            restored["error"].message
+            == "Planner LLM failed"
+        )
+
+        assert (
+            restored["error"].recoverable
+            is True
+        )
+
+        assert (
+            restored["error"].source
+            == "planner"
+        )
+
+    finally:
+        path = Path(
+            f"data/workflows/{workflow_id}.json"
+        )
+
+        if path.exists():
+            path.unlink()
+
+
+def test_old_checkpoint_without_error_still_loads():
+
+    workflow_id = "legacy-error-restart-test"
+
+    legacy_state = {
+        "workflow_id": workflow_id,
+        "iteration": 1,
+        "steps": [],
+        "tool_results": {},
+        "execution_records": [],
+        "completion_status": None,
+        "messages": [],
+        "context": {},
+        "output": {},
+        "done": False,
+    }
+
+    path = Path(
+        f"data/workflows/{workflow_id}.json"
+    )
+
+    try:
+        path.write_text(
+            json.dumps(legacy_state),
+            encoding="utf-8",
+        )
+
+        restored = load_workflow(
+            workflow_id,
+        )
+
+        assert restored["error"] is None
 
     finally:
         if path.exists():

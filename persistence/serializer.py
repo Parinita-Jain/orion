@@ -10,6 +10,33 @@ from langchain_core.messages import HumanMessage, AIMessage
 
 from runtime.approval_request import ApprovalRequest
 
+from errors import OrionError, ErrorType
+
+def serialize_error(error):
+
+    if error is None:
+        return None
+
+    return {
+        "error_type": error.error_type.value,
+        "message": error.message,
+        "recoverable": error.recoverable,
+        "source": error.source,
+    }
+
+
+def deserialize_error(data):
+
+    if data is None:
+        return None
+
+    return OrionError(
+        error_type=ErrorType(data["error_type"]),
+        message=data["message"],
+        recoverable=data["recoverable"],
+        source=data.get("source", "unknown"),
+    )
+
 
 def serialize_step(step):
     if is_dataclass(step):
@@ -48,6 +75,9 @@ def serialize_state(state):
         "workflow_id": state.get("workflow_id"),
         "iteration": state.get("iteration", 0),
         "done": state.get("done", False),
+        "error": serialize_error(
+                    state.get("error")
+                ),
         "steps": [
             serialize_step(step)
             for step in state.get("steps", [])
@@ -75,6 +105,7 @@ def serialize_state(state):
         "context": state.get("context", {}),
         "output": state.get("output", {}),
     }
+
 
 def deserialize_message(message):
     if message["type"] == "human":
@@ -108,6 +139,9 @@ def deserialize_state(data):
         "workflow_id": data["workflow_id"],
         "iteration": data["iteration"],
         "done": data.get("done", False),
+        "error": deserialize_error(
+            data.get("error")
+        ),
         "steps": steps,
         # keep your other existing restored fields here
 
@@ -134,4 +168,3 @@ def deserialize_state(data):
         "context": data.get("context", {}),
         "output": data.get("output", {}),
     }
-
