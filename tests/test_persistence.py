@@ -2911,3 +2911,17 @@ def test_successful_atomic_save_replaces_previous_checkpoint():
         if path.exists():
             path.unlink()
 
+def test_load_workflow_raises_when_workflow_does_not_exist():
+
+    workflow_id = "workflow-does-not-exist"
+
+    path = Path(
+        f"data/workflows/{workflow_id}.json"
+    )
+
+    if path.exists():
+        path.unlink()
+
+    with pytest.raises(FileNotFoundError):
+
+        load_workflow(workflow_id)
