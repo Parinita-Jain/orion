@@ -3018,3 +3018,89 @@ def test_old_checkpoint_without_output_still_loads():
     finally:
         if path.exists():
             path.unlink()
+
+def test_done_state_survives_restart():
+
+    workflow_id = "done-state-restart-test"
+
+    state = {
+        "workflow_id": workflow_id,
+        "iteration": 1,
+
+        "steps": [],
+
+        "context": {},
+
+        "output": {
+            "answer": "Final answer",
+        },
+
+        "tool_results": {},
+        "execution_records": [],
+
+        "completion_status": CompletionStatus.COMPLETE,
+
+        "messages": [],
+
+        "done": True,
+
+        "runtime_config": RuntimeConfig(),
+    }
+
+    try:
+        save_workflow(
+            workflow_id,
+            state,
+        )
+
+        restored = load_workflow(
+            workflow_id,
+        )
+
+        assert "done" in restored
+
+        assert restored["done"] is True
+
+    finally:
+        path = Path(
+            f"data/workflows/{workflow_id}.json"
+        )
+
+        if path.exists():
+            path.unlink()
+
+def test_old_checkpoint_without_done_still_loads():
+
+    workflow_id = "legacy-done-restart-test"
+
+    legacy_state = {
+        "workflow_id": workflow_id,
+        "iteration": 1,
+        "steps": [],
+        "tool_results": {},
+        "execution_records": [],
+        "completion_status": None,
+        "messages": [],
+        "context": {},
+        "output": {},
+    }
+
+    path = Path(
+        f"data/workflows/{workflow_id}.json"
+    )
+
+    try:
+        path.write_text(
+            json.dumps(legacy_state),
+            encoding="utf-8",
+        )
+
+        restored = load_workflow(
+            workflow_id,
+        )
+
+        assert restored["done"] is False
+
+    finally:
+        if path.exists():
+            path.unlink()
