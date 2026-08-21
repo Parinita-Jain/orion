@@ -3219,3 +3219,118 @@ def test_old_checkpoint_without_error_still_loads():
     finally:
         if path.exists():
             path.unlink()
+
+
+def test_tool_result_messages_survive_restart():
+
+    workflow_id = "tool-result-messages-restart-test"
+
+    state = {
+        "workflow_id": workflow_id,
+        "iteration": 1,
+        "steps": [],
+        "context": {},
+        "output": {},
+        "tool_results": {
+            1: {
+                "messages": [
+                    AIMessage(
+                        content="Step 1 skipped because dependency failed."
+                    )
+                ],
+                "output": {},
+                "success": False,
+                "status": StepStatus.SKIPPED,
+                "error": "Dependency failed.",
+            }
+        },
+        "execution_records": [],
+        "completion_status": None,
+        "messages": [],
+        "done": True,
+        "error": None,
+        "runtime_config": RuntimeConfig(),
+    }
+
+    try:
+        save_workflow(
+            workflow_id,
+            state,
+        )
+
+        restored = load_workflow(
+            workflow_id,
+        )
+
+        result = restored["tool_results"][1]
+
+        assert "messages" in result
+        assert len(result["messages"]) == 1
+        assert isinstance(
+            result["messages"][0],
+            AIMessage,
+        )
+        assert (
+            result["messages"][0].content
+            == "Step 1 skipped because dependency failed."
+        )
+
+    finally:
+        path = Path(
+            f"data/workflows/{workflow_id}.json"
+        )
+
+        if path.exists():
+            path.unlink()
+
+def test_old_tool_result_without_messages_still_loads():
+
+    workflow_id = "legacy-tool-result-messages-test"
+
+    legacy_state = {
+        "workflow_id": workflow_id,
+        "iteration": 1,
+        "steps": [],
+        "tool_results": {
+            "1": {
+                "output": {"answer": "old result"},
+                "success": True,
+                "status": "success",
+                "error": None,
+                "failure_reason": None,
+            }
+        },
+        "execution_records": [],
+        "completion_status": None,
+        "messages": [],
+        "context": {},
+        "output": {},
+        "done": False,
+        "error": None,
+    }
+
+    path = Path(
+        f"data/workflows/{workflow_id}.json"
+    )
+
+    try:
+        path.write_text(
+            json.dumps(legacy_state),
+            encoding="utf-8",
+        )
+
+        restored = load_workflow(
+            workflow_id,
+        )
+
+        result = restored["tool_results"][1]
+
+        assert result["output"] == {
+            "answer": "old result"
+        }
+
+        assert result["messages"] == []
+
+    finally:
+        if path.exists():
+            path.unlink()

@@ -55,6 +55,10 @@ def serialize_execution_record(record):
 def serialize_tool_result(result):
 
     return {
+        "messages": [
+            serialize_message(message)
+            for message in result.get("messages", [])
+        ],
         "output": result.get("output"),
         "success": result.get("success"),
         "status": result.get("status"),
@@ -146,7 +150,13 @@ def deserialize_state(data):
         # keep your other existing restored fields here
 
         "tool_results": {
-            int(step_id): result
+            int(step_id): {
+                **result,
+                "messages": [
+                    deserialize_message(message)
+                    for message in result.get("messages", [])
+                ],
+            }
             for step_id, result in data.get(
                 "tool_results",
                 {},
