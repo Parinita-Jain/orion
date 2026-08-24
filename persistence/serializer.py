@@ -12,6 +12,8 @@ from runtime.approval_request import ApprovalRequest
 
 from errors import OrionError, ErrorType
 
+from shared_types.step_status import StepStatus
+
 def serialize_error(error):
 
     if error is None:
@@ -73,6 +75,17 @@ def serialize_message(message):
         "id": message.id,
     }
 
+def deserialize_message(message):
+    if message["type"] == "human":
+        return HumanMessage(content=message["content"])
+
+    if message["type"] == "ai":
+        return AIMessage(content=message["content"])
+
+    raise ValueError(
+        f"Unsupported message type: {message['type']}"
+    )
+
 def serialize_state(state):
 
     return {
@@ -80,8 +93,8 @@ def serialize_state(state):
         "iteration": state.get("iteration", 0),
         "done": state.get("done", False),
         "error": serialize_error(
-                    state.get("error")
-                ),
+            state.get("error")
+        ),
         "steps": [
             serialize_step(step)
             for step in state.get("steps", [])
@@ -109,18 +122,6 @@ def serialize_state(state):
         "context": state.get("context", {}),
         "output": state.get("output", {}),
     }
-
-
-def deserialize_message(message):
-    if message["type"] == "human":
-        return HumanMessage(content=message["content"])
-
-    if message["type"] == "ai":
-        return AIMessage(content=message["content"])
-
-    raise ValueError(
-        f"Unsupported message type: {message['type']}"
-    )
 
 def deserialize_state(data):
 
@@ -152,6 +153,11 @@ def deserialize_state(data):
         "tool_results": {
             int(step_id): {
                 **result,
+                "status": (
+                    StepStatus(result["status"])
+                    if result.get("status") is not None
+                    else None
+                ),
                 "messages": [
                     deserialize_message(message)
                     for message in result.get("messages", [])
