@@ -3,7 +3,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from langchain_core.messages import AIMessage
 
-from executor.execution import ExecutionRecord
+from models.execution_record import ExecutionRecord
+
 from registry import get_tool
 
 from utils import (
@@ -30,6 +31,8 @@ from runtime.retry_error import RetryError
 from runtime.approval_decision import ApprovalDecision
 
 from condition import evaluate_condition
+
+from persistence import save_workflow
 
 def execute_step(step, state, tool_results):
 
@@ -87,7 +90,7 @@ def execute_step(step, state, tool_results):
 
         if timeout is None:
 
-            result = execute_with_retry(
+            result, retries = execute_with_retry(
                 tool_function,
                 tool_state,
                 tool_name=tool_name,
@@ -96,7 +99,7 @@ def execute_step(step, state, tool_results):
 
         else:
 
-            result = run_with_timeout(
+            result, retries = run_with_timeout(
                 execute_with_retry,
                 tool_function,
                 tool_state,
@@ -129,7 +132,7 @@ def execute_step(step, state, tool_results):
             step_id=step.id,
             tool=tool_name,
             success=result.get("success", True),
-            retries=0,          # we'll improve this later
+            retries=retries,
             start_time=start_time,
             end_time=end_time,
             duration=duration,
@@ -241,6 +244,12 @@ def failed_dependencies(step, tool_results):
             failed.append(dep)
 
     return failed
+
+def checkpoint_state(state):
+    save_workflow(
+        state["workflow_id"],
+        state,
+    )
 
 def executor_node(state):
 
@@ -646,6 +655,13 @@ def executor_node(state):
                 if step in pending_steps:
                     pending_steps.remove(step)
 
+                # Persist the state after this step has been
+                # completely incorporated into the workflow state.
+                state["tool_results"] = tool_results
+                state["execution_records"] = execution_records
+
+                checkpoint_state(state)
+
                 if result["success"]:
                     logger.info(
                         "Completed step %d",
@@ -721,6 +737,9 @@ def executor_node(state):
         )
     )
 
+
+    checkpoint_state(state)
+    
     return {
         "tool_results": tool_results,
         "execution_records": execution_records,

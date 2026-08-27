@@ -11,13 +11,14 @@ def test_execute_success_first_attempt():
 
     with patch("runtime.retry.time.sleep") as mock_sleep:
 
-        result = execute_with_retry(
+        result, retries = execute_with_retry(
             succeed,
             tool_name="dummy",
             max_retries=2,
         )
 
         assert result == "success"
+        assert retries == 0
         mock_sleep.assert_not_called()
 
 
@@ -37,13 +38,14 @@ def test_execute_success_after_retry():
 
     with patch("runtime.retry.time.sleep") as mock_sleep:
 
-        result = execute_with_retry(
+        result, retries = execute_with_retry(
             flaky,
             tool_name="dummy",
             max_retries=2,
         )
 
         assert result == "success"
+        assert retries == 1
         assert attempts == 2
         mock_sleep.assert_called_once_with(1)
 

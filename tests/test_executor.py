@@ -42,6 +42,7 @@ def make_state(**overrides):
         "tool_results": {},
         "execution_records": [],
         "runtime_config": RuntimeConfig(),
+        "workflow_id": "test-workflow",
         "event_bus": EventBus(),
     }
 
@@ -1446,3 +1447,52 @@ def test_executor_supersedes_replaced_step():
         result["tool_results"][2]["status"]
         == StepStatus.SUCCESS
     )
+
+def test_execute_step_records_retries_on_success_after_retry():
+
+    attempts = 0
+
+    def flaky_tool(state):
+
+        nonlocal attempts
+        attempts += 1
+
+        if attempts == 1:
+            raise RuntimeError("Temporary failure")
+
+        return {
+            "messages": [],
+            "output": {
+                "answer": "success",
+            },
+            "success": True,
+            "error": None,
+        }
+
+    register_tool(
+        Tool(
+            name="flaky",
+            function=flaky_tool,
+            description="Flaky tool",
+            outputs=["answer"],
+        )
+    )
+
+    step = PlanStep(
+        id=1,
+        tool="flaky",
+        tool_input="run",
+        depends_on=[],
+    )
+
+    state = make_state()
+
+    result = execute_step(
+        step,
+        state,
+        {},
+    )
+
+    assert attempts == 2
+    assert result["result"]["success"] is True
+    assert result["record"].retries == 1
