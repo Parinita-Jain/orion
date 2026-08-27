@@ -90,7 +90,7 @@ def execute_step(step, state, tool_results):
 
         if timeout is None:
 
-            result = execute_with_retry(
+            result, retries = execute_with_retry(
                 tool_function,
                 tool_state,
                 tool_name=tool_name,
@@ -99,7 +99,7 @@ def execute_step(step, state, tool_results):
 
         else:
 
-            result = run_with_timeout(
+            result, retries = run_with_timeout(
                 execute_with_retry,
                 tool_function,
                 tool_state,
@@ -132,7 +132,7 @@ def execute_step(step, state, tool_results):
             step_id=step.id,
             tool=tool_name,
             success=result.get("success", True),
-            retries=0,          # we'll improve this later
+            retries=retries,
             start_time=start_time,
             end_time=end_time,
             duration=duration,

@@ -24,7 +24,7 @@ def execute_with_retry(
     for attempt in range(max_retries + 1):
 
         try:
-            return func(*args, **kwargs)
+            return func(*args, **kwargs), attempt
 
         except Exception as e:
 
