@@ -67,12 +67,25 @@ def route_after_synthesizer(state):
         return "error"
 
     return "done"
+
 # Start Flow
-workflow.add_edge(START, "agent")
+def route_after_start(state):
+    if state.get("resume"):
+        return "executor"
+
+    return "agent"
+
+workflow.add_conditional_edges(
+    START,
+    route_after_start,
+    {
+        "agent": "agent",
+        "executor": "executor",
+    },
+)
 
 # Agent → Planner
 workflow.add_edge("agent", "planner")
-
 # Routing
 workflow.add_conditional_edges(
     "planner",
@@ -123,4 +136,4 @@ workflow.add_edge(
 )
 
 # Compile Graph
-app = workflow.compile() 
+app = workflow.compile()
