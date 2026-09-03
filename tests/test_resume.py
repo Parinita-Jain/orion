@@ -1,15 +1,17 @@
 from pathlib import Path
+from unittest.mock import patch
 
 from langchain_core.messages import HumanMessage
 
+from persistence import load_workflow, save_workflow
+from runtime.event_bus import EventBus
+from runtime.runtime_config import RuntimeConfig
+from schemas import PlanStep, ReplannerOutput
+from registry import Tool, clear_registry, register_tool
 from shared_types.completion_status import CompletionStatus
+from shared_types.failure_reason import FailureReason
 from shared_types.step_status import StepStatus
 
-from persistence import save_workflow
-from runtime.runtime_config import RuntimeConfig
-from schemas import PlanStep
-
-from registry import Tool, clear_registry, register_tool
 
 def test_resume_workflow_continues_persisted_workflow():
     workflow_id = "resume-integration-test"
@@ -180,6 +182,133 @@ def test_resume_completed_workflow_does_not_execute_again():
         # The existing successful result must remain intact.
         assert result["tool_results"][1]["success"] is True
         assert result["tool_results"][1]["output"]["value"] == 42
+
+    finally:
+        Path(
+            f"data/workflows/{workflow_id}.json"
+        ).unlink()
+
+
+def test_resume_replan_workflow_enters_replanner():
+    workflow_id = "replan-resume-api-test"
+    original_execution_count = 0
+    replacement_execution_count = 0
+
+    def original_tool(input_text):
+        nonlocal original_execution_count
+
+        original_execution_count += 1
+
+        return {
+            "messages": [],
+            "output": {"value": 10},
+            "success": True,
+            "status": StepStatus.SUCCESS,
+            "error": None,
+        }
+
+    def replacement_tool(input_text):
+        nonlocal replacement_execution_count
+
+        replacement_execution_count += 1
+
+        return {
+            "messages": [],
+            "output": {"value": 99},
+            "success": True,
+            "status": StepStatus.SUCCESS,
+            "error": None,
+        }
+
+    clear_registry()
+
+    register_tool(
+        Tool(
+            name="temporary_tool",
+            function=original_tool,
+            description="Original tool that must not be re-executed.",
+            outputs=["value"],
+        )
+    )
+
+    register_tool(
+        Tool(
+            name="replacement_tool",
+            function=replacement_tool,
+            description="Test replacement tool.",
+            outputs=["value"],
+        )
+    )
+
+    state = {
+        "workflow_id": workflow_id,
+        "iteration": 0,
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="temporary_tool",
+                tool_input="run",
+                depends_on=[],
+            )
+        ],
+        "tool_results": {
+            1: {
+                "messages": [],
+                "output": {},
+                "success": False,
+                "status": StepStatus.FAILED,
+                "error": "Request timed out",
+                "failure_reason": FailureReason.TIMEOUT,
+            }
+        },
+        "execution_records": [],
+        "messages": [HumanMessage(content="Complete the task.")],
+        "context": {},
+        "output": {},
+        "done": False,
+        "error": None,
+        "errors": [],
+        "completion_status": CompletionStatus.REPLAN,
+        "runtime_config": RuntimeConfig(),
+    }
+
+    replanner_output = ReplannerOutput(
+        done=False,
+        steps=[
+            PlanStep(
+                id=2,
+                tool="replacement_tool",
+                tool_input="run replacement",
+                depends_on=[],
+                replaces=1,
+            )
+        ],
+    )
+
+    try:
+        save_workflow(workflow_id, state)
+
+        with patch("replanner.llm") as mock_llm:
+            mock_llm.with_structured_output.return_value.invoke.return_value = (
+                replanner_output
+            )
+
+            from workflow.resume import resume_workflow
+
+            result = resume_workflow(workflow_id)
+
+        # The failed original step must not execute again.
+        assert original_execution_count == 0
+        assert replacement_execution_count == 1
+
+        # The replanner must have created the replacement step.
+        assert len(result["steps"]) == 2
+        assert result["steps"][1].id == 2
+        assert result["steps"][1].replaces == 1
+
+        # The replacement step must succeed.
+        assert result["tool_results"][2]["success"] is True
+        assert result["tool_results"][2]["output"]["value"] == 99
 
     finally:
         Path(

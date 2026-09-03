@@ -278,6 +278,30 @@ def executor_node(state):
         {},
     )
 
+    # Mark previously executed steps as superseded when a replacement
+    # step is present in the current plan.
+    for step in state["steps"]:
+        if (
+            step.replaces is not None
+            and step.replaces in tool_results
+        ):
+            original = tool_results[step.replaces]
+
+            if original["status"] != StepStatus.SUPERSEDED:
+                original["status"] = StepStatus.SUPERSEDED
+
+                logger.info(
+                    "Step %d superseded by step %d",
+                    step.replaces,
+                    step.id,
+                )
+
+    superseded_steps = {
+        step.replaces
+        for step in state["steps"]
+        if step.replaces is not None
+    }
+
     completed_steps = {
         step_id
         for step_id, result in tool_results.items()
@@ -297,7 +321,10 @@ def executor_node(state):
     pending_steps = [
         step
         for step in state["steps"]
-        if step.id not in completed_steps
+        if (
+            step.id not in completed_steps
+            and step.id not in superseded_steps
+        )
     ]
 
     while pending_steps:
@@ -631,26 +658,6 @@ def executor_node(state):
 
                 
                     completed_steps.add(step.id)
-
-                    # -----------------------------
-                    # Sprint 10 - Step Supersession
-                    # -----------------------------
-                    if (
-                        step.replaces is not None
-                        and step.replaces in tool_results
-                    ):
-
-                        original = tool_results[
-                            step.replaces
-                        ]
-
-                        original["status"] = StepStatus.SUPERSEDED
-
-                        logger.info(
-                            "Step %d superseded by step %d",
-                            step.replaces,
-                            step.id,
-                        )
 
                 if step in pending_steps:
                     pending_steps.remove(step)

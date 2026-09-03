@@ -2234,8 +2234,8 @@ def test_replacement_step_survives_restart(mock_llm):
     # Replacement Step 3 must execute.
     assert execution_counts["step_3"] == 1
 
-    # original tool processed once
-    assert execution_counts["step_2"] == 1
+    # Original Step 2 must not execute after restart because Step 3 replaces it.
+    assert execution_counts["step_2"] == 0
 
     # Original Step 2 must be superseded.
     assert (

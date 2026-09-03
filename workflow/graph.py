@@ -71,6 +71,9 @@ def route_after_synthesizer(state):
 # Start Flow
 def route_after_start(state):
     if state.get("resume"):
+        if state.get("completion_status") == CompletionStatus.REPLAN:
+            return "replanner"
+
         return "executor"
 
     return "agent"
@@ -81,6 +84,7 @@ workflow.add_conditional_edges(
     {
         "agent": "agent",
         "executor": "executor",
+        "replanner": "replanner",
     },
 )
 
