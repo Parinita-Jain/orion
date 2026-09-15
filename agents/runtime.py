@@ -1,30 +1,31 @@
 from dataclasses import replace
-from typing import Callable
 
 from agents.registry import get_agent
 from agents.task import AgentTask
 from models.plan import PlanStep
 
+from planner.service import PlanningService
+
 
 class AgentRuntime:
     """
     Runtime boundary for processing an AgentTask.
-
-    This first version deliberately does not execute PlanSteps and does not
-    invoke the LangGraph workflow directly.
-
-    It resolves the target agent, prepares agent-specific planning context,
-    invokes an injected planning function, and associates the resulting
-    runtime PlanSteps with the AgentTask.
     """
 
-    def build_planning_request(self, task: AgentTask) -> str:
-        """
-        Build the planning request supplied to the planner.
+    def __init__(
+        self,
+        planning_service: PlanningService | None = None,
+    ):
+        self.planning_service = (
+            planning_service
+            if planning_service is not None
+            else PlanningService()
+        )
 
-        Agent identity, role, instructions, and task request are kept together
-        so the planner can specialize its planning behavior for the agent.
-        """
+    def build_planning_request(
+        self,
+        task: AgentTask,
+    ) -> str:
 
         agent = get_agent(task.agent_id)
 
@@ -45,44 +46,20 @@ class AgentRuntime:
     def plan_task(
         self,
         task: AgentTask,
-        planner: Callable[[str], list[PlanStep]],
     ) -> list[PlanStep]:
-        """
-        Generate runtime PlanSteps for an AgentTask.
 
-        The planner is injected rather than imported directly. This keeps the
-        agent runtime independent of the current LangGraph planner node and
-        allows the planner integration to be introduced separately.
-        """
+        planning_request = self.build_planning_request(
+            task
+        )
 
-        planning_request = self.build_planning_request(task)
+        planned_steps = self.planning_service.plan(
+            planning_request
+        )
 
-        planned_steps = planner(planning_request)
-
-        if planned_steps is None:
-            raise ValueError(
-                "Planner returned no steps."
+        return [
+            replace(
+                step,
+                agent_task_id=task.task_id,
             )
-
-        if not isinstance(planned_steps, list):
-            raise TypeError(
-                "Planner must return a list of PlanStep objects."
-            )
-
-        runtime_steps = []
-
-        for step in planned_steps:
-
-            if not isinstance(step, PlanStep):
-                raise TypeError(
-                    "Planner returned a non-PlanStep object."
-                )
-
-            runtime_steps.append(
-                replace(
-                    step,
-                    agent_task_id=task.task_id,
-                )
-            )
-
-        return runtime_steps
+            for step in planned_steps
+        ]

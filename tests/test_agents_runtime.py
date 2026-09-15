@@ -10,6 +10,17 @@ from agents.runtime import AgentRuntime
 from models.plan import PlanStep
 
 
+class FakePlanningService:
+
+    def __init__(self, steps):
+        self.steps = steps
+        self.requests = []
+
+    def plan(self, request):
+        self.requests.append(request)
+        return self.steps
+
+
 @pytest.fixture(autouse=True)
 def clean_registry():
     clear_registry()
@@ -29,6 +40,7 @@ def register_research_agent():
 
 
 def test_build_planning_request():
+
     register_research_agent()
 
     task = AgentTask(
@@ -38,7 +50,9 @@ def test_build_planning_request():
         request="Research hybrid cars.",
     )
 
-    runtime = AgentRuntime()
+    runtime = AgentRuntime(
+        planning_service=FakePlanningService([])
+    )
 
     request = runtime.build_planning_request(task)
 
@@ -49,6 +63,7 @@ def test_build_planning_request():
 
 
 def test_build_planning_request_requires_registered_agent():
+
     task = AgentTask(
         task_id="T1",
         parent_task_id=None,
@@ -56,7 +71,9 @@ def test_build_planning_request_requires_registered_agent():
         request="Do something.",
     )
 
-    runtime = AgentRuntime()
+    runtime = AgentRuntime(
+        planning_service=FakePlanningService([])
+    )
 
     with pytest.raises(
         ValueError,
@@ -65,7 +82,8 @@ def test_build_planning_request_requires_registered_agent():
         runtime.build_planning_request(task)
 
 
-def test_plan_task_attaches_agent_task_id():
+def test_plan_task_uses_planning_service():
+
     register_research_agent()
 
     task = AgentTask(
@@ -75,41 +93,42 @@ def test_plan_task_attaches_agent_task_id():
         request="Research hybrid cars.",
     )
 
-    planner_request = {}
+    planned_steps = [
+        PlanStep(
+            id=1,
+            tool="rag",
+            tool_input="Research hybrid cars.",
+        ),
+        PlanStep(
+            id=2,
+            tool="llm",
+            tool_input="Summarize the research.",
+            depends_on=[1],
+        ),
+    ]
 
-    def fake_planner(request):
-        planner_request["value"] = request
-
-        return [
-            PlanStep(
-                id=1,
-                tool="rag",
-                tool_input="Research hybrid cars.",
-            ),
-            PlanStep(
-                id=2,
-                tool="llm",
-                tool_input="Summarize the research.",
-                depends_on=[1],
-            ),
-        ]
-
-    runtime = AgentRuntime()
-
-    steps = runtime.plan_task(
-        task,
-        fake_planner,
+    planning_service = FakePlanningService(
+        planned_steps
     )
 
+    runtime = AgentRuntime(
+        planning_service=planning_service
+    )
+
+    steps = runtime.plan_task(task)
+
     assert len(steps) == 2
+
     assert steps[0].agent_task_id == "T2"
     assert steps[1].agent_task_id == "T2"
 
-    assert planner_request["value"]
-    assert "Research Agent" in planner_request["value"]
+    assert len(planning_service.requests) == 1
+    assert "Research Agent" in planning_service.requests[0]
+    assert "Research hybrid cars." in planning_service.requests[0]
 
 
 def test_plan_task_does_not_mutate_planner_steps():
+
     register_research_agent()
 
     task = AgentTask(
@@ -125,66 +144,16 @@ def test_plan_task_does_not_mutate_planner_steps():
         tool_input="Research something.",
     )
 
-    def fake_planner(request):
-        return [original_step]
-
-    runtime = AgentRuntime()
-
-    steps = runtime.plan_task(
-        task,
-        fake_planner,
+    planning_service = FakePlanningService(
+        [original_step]
     )
+
+    runtime = AgentRuntime(
+        planning_service=planning_service
+    )
+
+    steps = runtime.plan_task(task)
 
     assert steps[0] is not original_step
     assert steps[0].agent_task_id == "T3"
     assert original_step.agent_task_id is None
-
-
-def test_plan_task_rejects_invalid_planner_result():
-    register_research_agent()
-
-    task = AgentTask(
-        task_id="T4",
-        parent_task_id=None,
-        agent_id="research",
-        request="Research something.",
-    )
-
-    runtime = AgentRuntime()
-
-    def bad_planner(request):
-        return "not a list"
-
-    with pytest.raises(
-        TypeError,
-        match="Planner must return a list of PlanStep objects.",
-    ):
-        runtime.plan_task(
-            task,
-            bad_planner,
-        )
-
-
-def test_plan_task_rejects_non_plan_step():
-    register_research_agent()
-
-    task = AgentTask(
-        task_id="T5",
-        parent_task_id=None,
-        agent_id="research",
-        request="Research something.",
-    )
-
-    runtime = AgentRuntime()
-
-    def bad_planner(request):
-        return ["not a PlanStep"]
-
-    with pytest.raises(
-        TypeError,
-        match="non-PlanStep",
-    ):
-        runtime.plan_task(
-            task,
-            bad_planner,
-        )
