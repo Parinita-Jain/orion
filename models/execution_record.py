@@ -22,3 +22,5 @@ class ExecutionRecord:
     duration: float
 
     error: str | None = None
+
+    agent_task_id: str | None = None
