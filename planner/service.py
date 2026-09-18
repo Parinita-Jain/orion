@@ -58,7 +58,11 @@ class PlanningService:
             else default_repair_plan
         )
 
-    def plan(self, request: str) -> list[RuntimePlanStep]:
+    def plan(
+        self,
+        request: str,
+        planning_context: str | None = None,
+    ) -> list[RuntimePlanStep]:
 
         question = request
         question_lower = question.lower().strip()
@@ -112,6 +116,15 @@ class PlanningService:
 
         tool_descriptions = get_tool_descriptions()
 
+        agent_context = ""
+
+        if planning_context:
+            agent_context = f"""
+        Agent Context:
+
+        {planning_context}
+        """
+
         prompt = f"""
         You are an AI planning assistant.
 
@@ -147,7 +160,7 @@ class PlanningService:
 
         {tool_descriptions}
 
-
+        {agent_context}
 
         Rules:
 

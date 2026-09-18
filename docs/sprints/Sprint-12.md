@@ -1,7 +1,7 @@
 ````markdown
 # Sprint 12 - Multi-Agent Architecture
 
-**Status:** Design agreed - implementation pending
+**Status:** Implementation in progress - initial multi-agent runtime integration complete
 
 ---
 
@@ -12,7 +12,20 @@ Before Sprint 12 implementation:
 - Existing test suite: **156 passed**
 - Sprint 11 visualization: complete
 - Sprint 11 committed and pushed
-- Sprint 12 implementation has not yet started
+
+Current Sprint 12 status:
+
+- Agent domain model: complete
+- Agent runtime boundary: complete
+- Initial workflow state integration: complete
+- Root Supervisor AgentTask creation: complete
+- Planner and Replanner integration: complete
+- Executor agent-task association: complete
+- Agent task/message persistence: complete
+- Full regression suite: **180 passed**
+- Explicit agent-to-agent delegation: not yet implemented
+- Agent-specific event extensions: not yet implemented
+- Agent visualization: deferred
 
 ---
 
@@ -1057,6 +1070,28 @@ At this point the following architectural decisions are agreed:
 * Persistence and event changes follow the core model rather than precede it.
 * Visualization will extend the existing Sprint 11 architecture.
 
-**Implementation has not yet started.**
+### Current Implementation Checkpoint
+
+The following implementation work is now complete:
+
+- Agent domain model has been implemented.
+- `AgentRuntime` has been introduced as the reusable agent execution boundary.
+- `PlanningService` has been extracted from the Planner node.
+- A root Supervisor AgentTask is created and reused across workflow resume.
+- AgentTasks and AgentMessages are represented in workflow state.
+- `PlanStep` and `ExecutionRecord` carry agent-task association.
+- Planner and Replanner output are converted to the canonical runtime `PlanStep`.
+- Agent task/message persistence has been integrated.
+- Existing Orion execution remains the common execution engine.
+- Full regression suite currently passes with **180 tests**.
+
+The following remain intentionally incomplete:
+
+- explicit agent-to-agent delegation
+- complete AgentTask completion semantics
+- agent-specific event extensions
+- agent visualization
+
+**Implementation is in progress.**
 
 ````

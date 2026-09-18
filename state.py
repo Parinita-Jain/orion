@@ -4,7 +4,7 @@ from typing_extensions import TypedDict
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 
-from schemas import PlanStep
+from models.plan import PlanStep
 from errors import OrionError
 
 from models.execution_record import ExecutionRecord
@@ -14,6 +14,10 @@ from shared_types.completion_status import CompletionStatus
 
 from runtime.runtime_config import RuntimeConfig
 from runtime.event_bus import EventBus
+
+from agents.task import AgentTask
+from agents.message import AgentMessage
+
 
 class AgentState(TypedDict):
 
@@ -38,8 +42,6 @@ class AgentState(TypedDict):
 
     execution_records: list[ExecutionRecord]
 
-    # ---------- NEW ----------
-
     error: OrionError | None
 
     errors: list[str]
@@ -53,3 +55,9 @@ class AgentState(TypedDict):
     runtime_config: RuntimeConfig
 
     event_bus: EventBus
+
+    agent_tasks: dict[str, AgentTask]
+
+    agent_messages: list[AgentMessage]
+
+    current_agent_task_id: str | None

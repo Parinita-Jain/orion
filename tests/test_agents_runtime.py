@@ -15,9 +15,15 @@ class FakePlanningService:
     def __init__(self, steps):
         self.steps = steps
         self.requests = []
+        self.contexts = []
 
-    def plan(self, request):
+    def plan(
+        self,
+        request,
+        planning_context=None,
+    ):
         self.requests.append(request)
+        self.contexts.append(planning_context)
         return self.steps
 
 
@@ -82,7 +88,7 @@ def test_build_planning_request_requires_registered_agent():
         runtime.build_planning_request(task)
 
 
-def test_plan_task_uses_planning_service():
+def test_plan_task_preserves_original_request():
 
     register_research_agent()
 
@@ -90,21 +96,15 @@ def test_plan_task_uses_planning_service():
         task_id="T2",
         parent_task_id=None,
         agent_id="research",
-        request="Research hybrid cars.",
+        request="25*7",
     )
 
     planned_steps = [
         PlanStep(
             id=1,
-            tool="rag",
-            tool_input="Research hybrid cars.",
-        ),
-        PlanStep(
-            id=2,
-            tool="llm",
-            tool_input="Summarize the research.",
-            depends_on=[1],
-        ),
+            tool="calculator",
+            tool_input="25*7",
+        )
     ]
 
     planning_service = FakePlanningService(
@@ -117,14 +117,14 @@ def test_plan_task_uses_planning_service():
 
     steps = runtime.plan_task(task)
 
-    assert len(steps) == 2
-
+    assert len(steps) == 1
     assert steps[0].agent_task_id == "T2"
-    assert steps[1].agent_task_id == "T2"
 
-    assert len(planning_service.requests) == 1
-    assert "Research Agent" in planning_service.requests[0]
-    assert "Research hybrid cars." in planning_service.requests[0]
+    assert planning_service.requests == ["25*7"]
+
+    assert len(planning_service.contexts) == 1
+    assert "Research Agent" in planning_service.contexts[0]
+    assert "25*7" in planning_service.contexts[0]
 
 
 def test_plan_task_does_not_mutate_planner_steps():

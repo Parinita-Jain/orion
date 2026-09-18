@@ -10,11 +10,13 @@ from shared_types.failure_classifier import (
 
 from shared_types.step_status import StepStatus
 
+from models.plan import PlanStep as RuntimePlanStep
+from runtime.approval_request import ApprovalRequest
+
+
 def replanner_node(state):
 
     print("\n===== REPLANNER NODE =====")
-
-    
 
     iteration = state.get("iteration", 0)
 
@@ -97,7 +99,9 @@ def replanner_node(state):
             recoverable_failed_steps += entry
         else:
             nonrecoverable_failed_steps += entry
+
     tool_descriptions = get_tool_descriptions()
+
     prompt = f"""
     You are an AI Replanner.
 
@@ -233,6 +237,7 @@ def replanner_node(state):
         replaces = null
 
     """
+
     structured_llm = llm.with_structured_output(
         ReplannerOutput
     )
@@ -256,20 +261,58 @@ def replanner_node(state):
 
     print("Done:", result.done)
 
+    current_agent_task_id = state.get(
+        "current_agent_task_id"
+    )
+
+    runtime_steps = [
+
+        RuntimePlanStep(
+            id=step.id,
+            tool=step.tool,
+            tool_input=step.tool_input,
+            depends_on=step.depends_on,
+            output=step.output,
+            timeout=None,
+            condition=step.condition,
+            replaces=step.replaces,
+            agent_task_id=current_agent_task_id,
+            approval=(
+                ApprovalRequest(
+                    step_id=step.id,
+                    tool=step.tool,
+                    reason=(
+                        step.approval.reason
+                        or "Planner requested approval."
+                    ),
+                )
+                if (
+                    step.approval is not None
+                    and step.approval.required
+                )
+                else None
+            ),
+        )
+
+        for step in result.steps
+
+    ]
+
     if not result.done:
 
         print("\n===== NEW STEPS =====")
 
-        for step in result.steps:
+        for step in runtime_steps:
 
             print(
                 f"Step {step.id}: "
                 f"{step.tool} "
                 f"(depends_on={step.depends_on})"
             )
+
     return {
-    "done": result.done,
-    "steps": state["steps"] + result.steps,
-    "iteration": iteration + 1,
-    "error": None,
+        "done": result.done,
+        "steps": state["steps"] + runtime_steps,
+        "iteration": iteration + 1,
+        "error": None,
     }

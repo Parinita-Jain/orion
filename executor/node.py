@@ -137,6 +137,7 @@ def execute_step(step, state, tool_results):
             end_time=end_time,
             duration=duration,
             error=result.get("error"),
+            agent_task_id=step.agent_task_id,
         )
 
         return {
@@ -160,6 +161,7 @@ def execute_step(step, state, tool_results):
                 end_time=end_time,
                 duration=duration,
                 error=str(e),
+                agent_task_id=step.agent_task_id,
             )
 
             return {
@@ -202,7 +204,8 @@ def execute_step(step, state, tool_results):
             start_time=start_time,
             end_time=end_time,
             duration=duration,
-            error=error
+            error=error,
+            agent_task_id=step.agent_task_id,
         )
 
         return {
@@ -396,6 +399,7 @@ def executor_node(state):
                                 f"Skipped because dependencies "
                                 f"{failed} failed."
                             ),
+                            agent_task_id=step.agent_task_id,
                         )
                     )
 
@@ -497,6 +501,7 @@ def executor_node(state):
                                 end_time=0,
                                 duration=0,
                                 error="Approval rejected.",
+                                agent_task_id=step.agent_task_id,
                             )
                         )
 
@@ -537,6 +542,7 @@ def executor_node(state):
                             end_time=0,
                             duration=0,
                             error=None,
+                            agent_task_id=step.agent_task_id,
                         )
                     )
 
@@ -632,6 +638,7 @@ def executor_node(state):
                         end_time=0,
                         duration=0,
                         error=str(e),
+                        agent_task_id=step.agent_task_id,
                     )
 
                 execution_records.append(record)

@@ -53,7 +53,8 @@ class AgentRuntime:
         )
 
         planned_steps = self.planning_service.plan(
-            planning_request
+            task.request,
+            planning_context=planning_request,
         )
 
         return [

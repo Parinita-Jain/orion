@@ -1,18 +1,20 @@
-from models.plan import PlanStep
-
-from dataclasses import asdict,is_dataclass
-
-from shared_types.completion_status import CompletionStatus
-
-from models.execution_record import ExecutionRecord
+from dataclasses import asdict, is_dataclass
 
 from langchain_core.messages import HumanMessage, AIMessage
+
+from models.plan import PlanStep
+from models.execution_record import ExecutionRecord
 
 from runtime.approval_request import ApprovalRequest
 
 from errors import OrionError, ErrorType
 
+from shared_types.completion_status import CompletionStatus
 from shared_types.step_status import StepStatus
+
+from agents.task import AgentTask, AgentTaskStatus
+from agents.message import AgentMessage
+
 
 def serialize_error(error):
 
@@ -41,6 +43,7 @@ def deserialize_error(data):
 
 
 def serialize_step(step):
+
     if is_dataclass(step):
         return asdict(step)
 
@@ -51,8 +54,10 @@ def serialize_step(step):
         f"Unsupported step type: {type(step)}"
     )
 
+
 def serialize_execution_record(record):
     return asdict(record)
+
 
 def serialize_tool_result(result):
 
@@ -68,23 +73,94 @@ def serialize_tool_result(result):
         "failure_reason": result.get("failure_reason"),
     }
 
+
 def serialize_message(message):
+
     return {
         "type": message.type,
         "content": message.content,
         "id": message.id,
     }
 
+
 def deserialize_message(message):
+
     if message["type"] == "human":
-        return HumanMessage(content=message["content"])
+        return HumanMessage(
+            content=message["content"]
+        )
 
     if message["type"] == "ai":
-        return AIMessage(content=message["content"])
+        return AIMessage(
+            content=message["content"]
+        )
 
     raise ValueError(
         f"Unsupported message type: {message['type']}"
     )
+
+
+def serialize_agent_task(task: AgentTask):
+
+    return {
+        "task_id": task.task_id,
+        "parent_task_id": task.parent_task_id,
+        "agent_id": task.agent_id,
+        "request": task.request,
+        "status": task.status.value,
+        "result": task.result,
+        "metadata": task.metadata,
+    }
+
+
+def deserialize_agent_task(data):
+
+    return AgentTask(
+        task_id=data["task_id"],
+        parent_task_id=data.get(
+            "parent_task_id"
+        ),
+        agent_id=data["agent_id"],
+        request=data["request"],
+        status=AgentTaskStatus(
+            data.get(
+                "status",
+                AgentTaskStatus.CREATED.value,
+            )
+        ),
+        result=data.get("result"),
+        metadata=data.get(
+            "metadata",
+            {},
+        ),
+    )
+
+
+def serialize_agent_message(message: AgentMessage):
+
+    return {
+        "message_id": message.message_id,
+        "sender": message.sender,
+        "recipient": message.recipient,
+        "content": message.content,
+        "task_id": message.task_id,
+        "correlation_id": message.correlation_id,
+    }
+
+
+def deserialize_agent_message(data):
+
+    return AgentMessage(
+        message_id=data["message_id"],
+        sender=data["sender"],
+        recipient=data["recipient"],
+        content=data["content"],
+        task_id=data.get("task_id"),
+        correlation_id=data.get(
+            "correlation_id"
+        ),
+    )
+
 
 def serialize_state(state):
 
@@ -92,13 +168,16 @@ def serialize_state(state):
         "workflow_id": state.get("workflow_id"),
         "iteration": state.get("iteration", 0),
         "done": state.get("done", False),
+
         "error": serialize_error(
             state.get("error")
         ),
+
         "steps": [
             serialize_step(step)
             for step in state.get("steps", [])
         ],
+
         "tool_results": {
             int(step_id): serialize_tool_result(result)
             for step_id, result in state.get(
@@ -106,32 +185,76 @@ def serialize_state(state):
                 {},
             ).items()
         },
+
         "completion_status": (
             state["completion_status"].value
             if state.get("completion_status") is not None
             else None
         ),
+
         "execution_records": [
             serialize_execution_record(record)
-            for record in state.get("execution_records", [])
+            for record in state.get(
+                "execution_records",
+                [],
+            )
         ],
+
         "messages": [
             serialize_message(message)
-            for message in state.get("messages", [])
+            for message in state.get(
+                "messages",
+                [],
+            )
         ],
-        "context": state.get("context", {}),
-        "output": state.get("output", {}),
+
+        "context": state.get(
+            "context",
+            {},
+        ),
+
+        "output": state.get(
+            "output",
+            {},
+        ),
+
+        "agent_tasks": {
+            task_id: serialize_agent_task(task)
+            for task_id, task in state.get(
+                "agent_tasks",
+                {},
+            ).items()
+        },
+
+        "agent_messages": [
+            serialize_agent_message(message)
+            for message in state.get(
+                "agent_messages",
+                [],
+            )
+        ],
+
+        "current_agent_task_id": state.get(
+            "current_agent_task_id"
+        ),
     }
+
 
 def deserialize_state(data):
 
     steps = []
 
-    for step in data.get("steps", []):
+    for step in data.get(
+        "steps",
+        [],
+    ):
 
-        approval_data = step.get("approval")
+        approval_data = step.get(
+            "approval"
+        )
 
         if approval_data is not None:
+
             step["approval"] = ApprovalRequest(
                 **approval_data
             )
@@ -140,47 +263,129 @@ def deserialize_state(data):
             PlanStep(**step)
         )
 
+    agent_tasks = {
+        task_id: deserialize_agent_task(task_data)
+        for task_id, task_data in data.get(
+            "agent_tasks",
+            {},
+        ).items()
+    }
+
+    agent_messages = [
+        deserialize_agent_message(
+            message
+        )
+        for message in data.get(
+            "agent_messages",
+            [],
+        )
+    ]
+
     return {
+
         "workflow_id": data["workflow_id"],
+
         "iteration": data["iteration"],
-        "done": data.get("done", False),
+
+        "done": data.get(
+            "done",
+            False,
+        ),
+
         "error": deserialize_error(
             data.get("error")
         ),
+
         "steps": steps,
-        # keep your other existing restored fields here
 
         "tool_results": {
+
             int(step_id): {
+
                 **result,
+
                 "status": (
-                    StepStatus(result["status"])
+                    StepStatus(
+                        result["status"]
+                    )
                     if result.get("status") is not None
                     else None
                 ),
+
                 "messages": [
-                    deserialize_message(message)
-                    for message in result.get("messages", [])
+                    deserialize_message(
+                        message
+                    )
+                    for message in result.get(
+                        "messages",
+                        [],
+                    )
                 ],
+
             }
+
             for step_id, result in data.get(
                 "tool_results",
                 {},
             ).items()
+
         },
+
         "completion_status": (
-            CompletionStatus(data["completion_status"])
-            if data.get("completion_status") is not None
+
+            CompletionStatus(
+                data["completion_status"]
+            )
+
+            if data.get(
+                "completion_status"
+            ) is not None
+
             else None
+
         ),
+
         "execution_records": [
-            ExecutionRecord(**record)
-            for record in data.get("execution_records", [])
+
+            ExecutionRecord(
+                **record
+            )
+
+            for record in data.get(
+                "execution_records",
+                [],
+            )
+
         ],
+
         "messages": [
-            deserialize_message(message)
-            for message in data.get("messages", [])
+
+            deserialize_message(
+                message
+            )
+
+            for message in data.get(
+                "messages",
+                [],
+            )
+
         ],
-        "context": data.get("context", {}),
-        "output": data.get("output", {}),
+
+        "context": data.get(
+            "context",
+            {},
+        ),
+
+        "output": data.get(
+            "output",
+            {},
+        ),
+
+        "agent_tasks": agent_tasks,
+
+        "agent_messages": agent_messages,
+
+        "current_agent_task_id": data.get(
+            "current_agent_task_id"
+        ),
     }

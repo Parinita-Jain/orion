@@ -217,3 +217,20 @@ def test_runtime_uses_real_planning_service():
 
     assert len(steps) == 1
     assert steps[0].agent_task_id == "T1"
+
+def test_planning_context_does_not_change_calculator_rule():
+
+    service = PlanningService()
+
+    steps = service.plan(
+        "25*7",
+        planning_context=(
+            "Agent: Research Agent\n"
+            "Agent Role: research\n"
+            "Agent Instructions: Research the assigned subject."
+        ),
+    )
+
+    assert len(steps) == 1
+    assert steps[0].tool == "calculator"
+    assert steps[0].tool_input == "25*7"
