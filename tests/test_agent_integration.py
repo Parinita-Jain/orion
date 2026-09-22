@@ -14,6 +14,13 @@ from agents import (
 
 from agent import agent_node
 
+from unittest.mock import patch
+
+from agents.decision import (
+    AgentAction,
+    AgentDecision,
+)
+
 from models.execution_record import ExecutionRecord
 from models.plan import PlanStep
 
@@ -61,20 +68,25 @@ def test_agent_node_creates_root_supervisor_task():
         "current_agent_task_id": None,
     }
 
-    result = agent_node(state)
+    with patch("agents.runtime.AgentRuntime") as mock_runtime:
+        mock_runtime.return_value.decide_task.return_value = (
+            AgentDecision(
+                action=AgentAction.PLAN,
+            )
+        )
+
+        result = agent_node(state)
 
     assert result["current_agent_task_id"] == "T1"
 
-    tasks = result["agent_tasks"]
+    task = result["agent_tasks"]["T1"]
 
-    assert list(tasks.keys()) == ["T1"]
-
-    task = tasks["T1"]
-
-    assert task.agent_id == "supervisor"
     assert task.parent_task_id is None
+    assert task.agent_id == "supervisor"
     assert task.request == "25*7"
     assert task.status == AgentTaskStatus.RUNNING
+
+    assert result["agent_next_node"] == "planner"
 
 
 def test_agent_node_reuses_existing_root_task():
@@ -146,7 +158,7 @@ def test_planner_node_uses_current_agent_task():
 
     class FakeAgentRuntime:
 
-        def plan_task(self, received_task):
+        def plan_task(self, received_task, existing_steps=None):
             assert received_task is task
             return [planned_step]
 

@@ -1,37 +1,94 @@
-from langgraph.graph import StateGraph, START, END
+from langgraph.graph import (
+    StateGraph,
+    START,
+    END,
+)
 
 from state import AgentState
 
 from workflow.nodes import (
     agent_node,
     planner_node,
-    executor_node
+    executor_node,
 )
+
 from .completion import completion_node
+
 from replanner import replanner_node
+
 from synthesizer import synthesizer_node
+
 from error_handler import error_handler_node
 
 from shared_types.completion_status import CompletionStatus
 
-# Create Graph
-workflow = StateGraph(AgentState)
 
-# Add Nodes
-workflow.add_node("agent", agent_node)
-workflow.add_node("planner", planner_node)
-workflow.add_node("executor", executor_node)
-workflow.add_node("completion",completion_node)
-workflow.add_node("replanner",replanner_node)
-workflow.add_node("synthesizer", synthesizer_node)
-workflow.add_node("error_handler",error_handler_node)
+workflow = StateGraph(
+    AgentState
+)
+
+
+workflow.add_node(
+    "agent",
+    agent_node,
+)
+
+workflow.add_node(
+    "planner",
+    planner_node,
+)
+
+workflow.add_node(
+    "executor",
+    executor_node,
+)
+
+workflow.add_node(
+    "completion",
+    completion_node,
+)
+
+workflow.add_node(
+    "replanner",
+    replanner_node,
+)
+
+workflow.add_node(
+    "synthesizer",
+    synthesizer_node,
+)
+
+workflow.add_node(
+    "error_handler",
+    error_handler_node,
+)
+
+
+def route_after_agent(state):
+
+    if state.get("error"):
+        return "error"
+
+    return state.get(
+        "agent_next_node",
+        "error",
+    )
+
+def _is_legacy_workflow(state):
+    return (
+        not state.get("agent_tasks")
+        and state.get("current_agent_task_id") is None
+        and bool(state.get("steps"))
+    )
 
 def route_after_completion(state):
 
     status = state["completion_status"]
 
     if status == CompletionStatus.COMPLETE:
-        return "synthesizer"
+        if _is_legacy_workflow(state):
+            return "synthesizer"
+        return "agent"
 
     if status == CompletionStatus.CONTINUE:
         return "executor"
@@ -41,15 +98,13 @@ def route_after_completion(state):
 
     return "error_handler"
 
-def route_after_planner(state):
 
-    print(state)
+def route_after_planner(state):
 
     if state.get("error"):
         return "error"
 
     return "executor"
-
 
 def route_after_replanner(state):
 
@@ -57,9 +112,13 @@ def route_after_replanner(state):
         return "error"
 
     if state.get("done"):
-        return "synthesizer"
+        if _is_legacy_workflow(state):
+            return "synthesizer"
+
+        return "agent"
 
     return "executor"
+
 
 def route_after_synthesizer(state):
 
@@ -68,15 +127,23 @@ def route_after_synthesizer(state):
 
     return "done"
 
-# Start Flow
+
 def route_after_start(state):
+
     if state.get("resume"):
-        if state.get("completion_status") == CompletionStatus.REPLAN:
+
+        if (
+            state.get(
+                "completion_status"
+            )
+            == CompletionStatus.REPLAN
+        ):
             return "replanner"
 
         return "executor"
 
     return "agent"
+
 
 workflow.add_conditional_edges(
     START,
@@ -88,45 +155,62 @@ workflow.add_conditional_edges(
     },
 )
 
-# Agent → Planner
-workflow.add_edge("agent", "planner")
-# Routing
+
+workflow.add_conditional_edges(
+    "agent",
+    route_after_agent,
+    {
+        "planner": "planner",
+        "agent": "agent",
+        "synthesizer": "synthesizer",
+        "error": "error_handler",
+    },
+)
+
+
 workflow.add_conditional_edges(
     "planner",
     route_after_planner,
     {
         "executor": "executor",
-        "error": "error_handler"
-    }
+        "error": "error_handler",
+    },
 )
-# RAG Path
+
+
 workflow.add_edge(
     "executor",
-    "completion"
+    "completion",
 )
+
+
 workflow.add_conditional_edges(
     "completion",
     route_after_completion,
     {
-        "synthesizer": "synthesizer",
+        "agent": "agent",
         "executor": "executor",
         "replanner": "replanner",
+        "error_handler": "error_handler",
+        "synthesizer": "synthesizer",
+    },
+)
+
+
+workflow.add_conditional_edges(
+    "replanner",
+    route_after_replanner,
+    {
+        "agent": "agent",
+        "executor": "executor",
         "error": "error_handler",
     },
 )
-workflow.add_conditional_edges(
-    "replanner",
-     route_after_replanner,
-    {
-        "executor": "executor",
-        "synthesizer": "synthesizer",
-        "error": "error_handler"
-    }
-)
+
 
 workflow.add_conditional_edges(
     "synthesizer",
-     route_after_synthesizer,
+    route_after_synthesizer,
     {
         "done": END,
         "error": "error_handler",
@@ -136,8 +220,8 @@ workflow.add_conditional_edges(
 
 workflow.add_edge(
     "error_handler",
-    END
+    END,
 )
 
-# Compile Graph
+
 app = workflow.compile()

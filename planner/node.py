@@ -3,6 +3,7 @@ from errors import OrionError
 
 from .llm import get_structured_llm
 from .repair import repair_plan
+
 from .service import (
     MAX_REPAIR_ATTEMPTS,
     PlanningService,
@@ -33,13 +34,18 @@ def planner_node(state):
 
         from agents.runtime import AgentRuntime
 
-        task = agent_tasks[current_task_id]
+        task = agent_tasks[
+            current_task_id
+        ]
 
         runtime = AgentRuntime()
 
         try:
 
-            steps = runtime.plan_task(task)
+            steps = runtime.plan_task(
+                task,
+                existing_steps=state.get("steps", []),
+            )
 
         except OrionError as e:
 
@@ -49,7 +55,13 @@ def planner_node(state):
             }
 
         return {
-            "steps": steps,
+            "steps": (
+                state.get(
+                    "steps",
+                    [],
+                )
+                + steps
+            ),
             "error": None,
         }
 

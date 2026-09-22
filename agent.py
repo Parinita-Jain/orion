@@ -1,61 +1,17 @@
-from agents.models import AgentDefinition
-from agents.registry import (
-    get_agent,
-    register_agent,
-)
-from agents.task import (
-    AgentTask,
-    AgentTaskStatus,
+from agents.controller import (
+    SUPERVISOR_AGENT,
+    build_decision_context,
+    ensure_active_task,
+    get_task_steps,
+    process_agent_decision,
 )
 
+from agents.task import AgentTaskStatus
 
-SUPERVISOR_AGENT = AgentDefinition(
-    id="supervisor",
-    name="Supervisor Agent",
-    role="supervisor",
-    instructions=(
-        "Coordinate the user's request, determine the required work, "
-        "and delegate work to specialized agents when appropriate."
-    ),
+from errors import (
+    ErrorType,
+    OrionError,
 )
-
-
-def get_supervisor_agent():
-    """
-    Return the registered supervisor, registering the default supervisor
-    definition when necessary.
-    """
-
-    agent = get_agent(SUPERVISOR_AGENT.id)
-
-    if agent is None:
-        register_agent(SUPERVISOR_AGENT)
-        agent = SUPERVISOR_AGENT
-
-    return agent
-
-
-def _next_task_id(agent_tasks):
-    """
-    Generate the next workflow-local task ID.
-    """
-
-    number = 1
-
-    while f"T{number}" in agent_tasks:
-        number += 1
-
-    return f"T{number}"
-
-
-def _find_root_task(agent_tasks):
-
-    for task in agent_tasks.values():
-
-        if task.parent_task_id is None:
-            return task
-
-    return None
 
 
 def agent_node(state):
@@ -63,55 +19,81 @@ def agent_node(state):
     print("\n===== AGENT NODE =====")
 
     agent_tasks = dict(
-        state.get("agent_tasks", {})
+        state.get(
+            "agent_tasks",
+            {},
+        )
     )
 
     agent_messages = list(
-        state.get("agent_messages", [])
+        state.get(
+            "agent_messages",
+            [],
+        )
+    )
+
+    messages = state.get(
+        "messages",
+        [],
     )
 
     current_task_id = state.get(
         "current_agent_task_id"
     )
 
-    task = None
+    try:
 
-    if current_task_id is not None:
-        task = agent_tasks.get(current_task_id)
-
-    if task is None:
-        task = _find_root_task(agent_tasks)
-
-    if task is None:
-
-        messages = state.get("messages", [])
-
-        if not messages:
-            raise ValueError(
-                "Cannot create supervisor task without a user message."
-            )
-
-        request = messages[-1].content
-
-        get_supervisor_agent()
-
-        task_id = _next_task_id(agent_tasks)
-
-        task = AgentTask(
-            task_id=task_id,
-            parent_task_id=None,
-            agent_id="supervisor",
-            request=request,
-            status=AgentTaskStatus.ASSIGNED,
+        task = ensure_active_task(
+            agent_tasks=agent_tasks,
+            agent_messages=agent_messages,
+            current_task_id=current_task_id,
+            messages=messages,
         )
 
-        agent_tasks[task_id] = task
+        task.status = AgentTaskStatus.RUNNING
 
-    task.status = AgentTaskStatus.RUNNING
+        decision_context = build_decision_context(
+            task,
+            state,
+        )
 
-    return {
-        "agent_tasks": agent_tasks,
-        "agent_messages": agent_messages,
-        "current_agent_task_id": task.task_id,
-        "iteration": state.get("iteration", 0),
-    }
+        allow_delegation = not bool(
+            get_task_steps(
+                state,
+                task.task_id,
+            )
+        )
+
+        from agents.runtime import AgentRuntime
+
+        runtime = AgentRuntime()
+
+        decision = runtime.decide_task(
+            task,
+            decision_context=decision_context,
+            allow_delegation=allow_delegation,
+        )
+
+        return process_agent_decision(
+            agent_tasks=agent_tasks,
+            agent_messages=agent_messages,
+            current_task_id=task.task_id,
+            state=state,
+            decision=decision,
+        )
+
+    except Exception as e:
+
+        return {
+            "agent_tasks": agent_tasks,
+            "agent_messages": agent_messages,
+            "current_agent_task_id": current_task_id,
+            "agent_next_node": "error",
+            "error": OrionError(
+                source="agent",
+                error_type=ErrorType.PLANNER,
+                message=str(e),
+                recoverable=True,
+                original_exception=e,
+            ),
+        }

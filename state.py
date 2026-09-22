@@ -1,21 +1,25 @@
 from typing import Annotated, Sequence, Any
+
 from typing_extensions import TypedDict
 
 from langchain_core.messages import BaseMessage
+
 from langgraph.graph.message import add_messages
 
 from models.plan import PlanStep
+
 from errors import OrionError
 
 from models.execution_record import ExecutionRecord
-from config import logger
 
 from shared_types.completion_status import CompletionStatus
 
 from runtime.runtime_config import RuntimeConfig
+
 from runtime.event_bus import EventBus
 
 from agents.task import AgentTask
+
 from agents.message import AgentMessage
 
 
@@ -61,3 +65,5 @@ class AgentState(TypedDict):
     agent_messages: list[AgentMessage]
 
     current_agent_task_id: str | None
+
+    agent_next_node: str | None
