@@ -11,5 +11,6 @@ class WorkflowEvent:
     timestamp: float = field(default_factory=time.time)
     step_id: int | None = None
     tool: str | None = None
-
     payload: dict[str, Any] = field(default_factory=dict)
+    agent_task_id: str | None = None
+    agent_id: str | None = None

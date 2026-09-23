@@ -22,10 +22,16 @@ from agents.task import (
 from agents.task_manager import (
     complete_task,
     create_child_task,
+    fail_task,
     get_parent_task,
     get_task,
     start_task,
 )
+
+from runtime.event import WorkflowEvent
+from runtime.event_bus import EventBus
+
+from shared_types.workflow_event_type import WorkflowEventType
 
 
 SUPERVISOR_AGENT = AgentDefinition(
@@ -82,11 +88,66 @@ def _find_root_task(
     return None
 
 
+def _emit_agent_event(
+    event_bus: EventBus | None,
+    event_type: WorkflowEventType,
+    task: AgentTask,
+    payload: dict[str, Any] | None = None,
+):
+    if event_bus is None:
+        return
+
+    event_bus.emit(
+        WorkflowEvent(
+            type=event_type,
+            agent_task_id=task.task_id,
+            agent_id=task.agent_id,
+            payload=payload or {},
+        )
+    )
+
+
+def _emit_message_event(
+    event_bus: EventBus | None,
+    message: AgentMessage,
+):
+    if event_bus is None:
+        return
+
+    event_bus.emit(
+        WorkflowEvent(
+            type=WorkflowEventType.AGENT_MESSAGE,
+            agent_task_id=message.task_id,
+            agent_id=message.sender,
+            payload={
+                "message_id": message.message_id,
+                "sender": message.sender,
+                "recipient": message.recipient,
+                "content": message.content,
+                "correlation_id": message.correlation_id,
+            },
+        )
+    )
+
+
+def _append_agent_message(
+    agent_messages: list[AgentMessage],
+    message: AgentMessage,
+    event_bus: EventBus | None,
+):
+    agent_messages.append(message)
+    _emit_message_event(
+        event_bus,
+        message,
+    )
+
+
 def ensure_active_task(
     agent_tasks: dict[str, AgentTask],
     agent_messages: list[AgentMessage],
     current_task_id: str | None,
     messages: Any,
+    event_bus: EventBus | None = None,
 ) -> AgentTask:
     """
     Resolve the current task or create the workflow root Supervisor task.
@@ -128,6 +189,16 @@ def ensure_active_task(
         )
 
         agent_tasks[task_id] = task
+
+        _emit_agent_event(
+            event_bus,
+            WorkflowEventType.AGENT_TASK_CREATED,
+            task,
+            payload={
+                "parent_task_id": task.parent_task_id,
+                "request": task.request,
+            },
+        )
 
     return task
 
@@ -286,12 +357,102 @@ def _default_task_result(
     }
 
 
+def start_agent_task(
+    agent_tasks: dict[str, AgentTask],
+    task_id: str,
+    event_bus: EventBus | None = None,
+) -> AgentTask:
+    """
+    Start an AgentTask and emit its lifecycle event.
+
+    A task that is already RUNNING is left unchanged so repeated workflow
+    visits do not produce duplicate start events.
+    """
+
+    task = get_task(
+        agent_tasks,
+        task_id,
+    )
+
+    if task.status == AgentTaskStatus.RUNNING:
+        return task
+
+    task = start_task(
+        agent_tasks,
+        task_id,
+    )
+
+    _emit_agent_event(
+        event_bus,
+        WorkflowEventType.AGENT_TASK_STARTED,
+        task,
+        payload={
+            "status": task.status.value,
+        },
+    )
+
+    return task
+
+
+def complete_agent_task(
+    agent_tasks: dict[str, AgentTask],
+    task_id: str,
+    result: Any = None,
+    event_bus: EventBus | None = None,
+) -> AgentTask:
+
+    task = complete_task(
+        agent_tasks,
+        task_id,
+        result=result,
+    )
+
+    _emit_agent_event(
+        event_bus,
+        WorkflowEventType.AGENT_TASK_COMPLETED,
+        task,
+        payload={
+            "result": task.result,
+        },
+    )
+
+    return task
+
+
+def fail_agent_task(
+    agent_tasks: dict[str, AgentTask],
+    task_id: str,
+    error: str | None = None,
+    result: Any = None,
+    event_bus: EventBus | None = None,
+) -> AgentTask:
+
+    task = fail_task(
+        agent_tasks,
+        task_id,
+        result=result,
+    )
+
+    _emit_agent_event(
+        event_bus,
+        WorkflowEventType.AGENT_TASK_FAILED,
+        task,
+        payload={
+            "error": error,
+            "result": task.result,
+        },
+    )
+
+    return task
+
+
 def process_agent_decision(
     agent_tasks: dict[str, AgentTask],
     agent_messages: list[AgentMessage],
     current_task_id: str,
     state,
     decision: AgentDecision,
+    event_bus: EventBus | None = None,
 ):
     """
     Apply an AgentDecision to workflow-level AgentTask state.
@@ -334,19 +495,32 @@ def process_agent_decision(
             request=decision.request,
         )
 
-        start_task(
-            agent_tasks,
-            child.task_id,
+        _emit_agent_event(
+            event_bus,
+            WorkflowEventType.AGENT_TASK_CREATED,
+            child,
+            payload={
+                "parent_task_id": child.parent_task_id,
+                "request": child.request,
+            },
         )
 
-        agent_messages.append(
-            AgentMessage(
+        start_agent_task(
+            agent_tasks,
+            child.task_id,
+            event_bus=event_bus,
+        )
+
+        _append_agent_message(
+            agent_messages=agent_messages,
+            message=AgentMessage(
                 message_id=f"delegation-{child.task_id}",
                 sender=task.agent_id,
                 recipient=child.agent_id,
                 content=child.request,
                 task_id=child.task_id,
-            )
+            ),
+            event_bus=event_bus,
         )
 
         return {
@@ -372,22 +546,25 @@ def process_agent_decision(
             task.task_id,
         )
 
-        complete_task(
+        complete_agent_task(
             agent_tasks,
             task.task_id,
             result=result,
+            event_bus=event_bus,
         )
 
         if parent is not None:
 
-            agent_messages.append(
-                AgentMessage(
+            _append_agent_message(
+                agent_messages=agent_messages,
+                message=AgentMessage(
                     message_id=f"result-{task.task_id}",
                     sender=task.agent_id,
                     recipient=parent.agent_id,
                     content=result,
                     task_id=task.task_id,
-                )
+                ),
+                event_bus=event_bus,
             )
 
             return {

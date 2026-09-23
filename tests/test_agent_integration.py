@@ -112,7 +112,13 @@ def test_agent_node_reuses_existing_root_task():
         "current_agent_task_id": "T1",
     }
 
-    result = agent_node(state)
+    with patch(
+        "agents.runtime.AgentRuntime.decide_task",
+        return_value=AgentDecision(
+            action=AgentAction.PLAN
+        ),
+    ):
+        result = agent_node(state)
 
     assert result["current_agent_task_id"] == "T1"
     assert list(result["agent_tasks"].keys()) == ["T1"]
