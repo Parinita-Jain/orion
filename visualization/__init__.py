@@ -1,6 +1,9 @@
 from visualization.builder import build_workflow_graph
 from visualization.mermaid import render_mermaid
 from visualization.model import (
+    AgentEdge,
+    AgentEdgeType,
+    AgentTaskNode,
     EdgeType,
     WorkflowEdge,
     WorkflowGraph,
@@ -8,6 +11,9 @@ from visualization.model import (
 )
 
 __all__ = [
+    "AgentEdge",
+    "AgentEdgeType",
+    "AgentTaskNode",
     "EdgeType",
     "WorkflowEdge",
     "WorkflowGraph",

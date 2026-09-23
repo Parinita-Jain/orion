@@ -5,6 +5,13 @@ from visualization.model import (
     WorkflowGraph,
     WorkflowNode,
 )
+from agents.task import AgentTaskStatus
+from visualization.model import (
+    AgentEdge,
+    AgentEdgeType,
+    AgentTaskNode,
+)
+
 from shared_types.step_status import StepStatus
 
 
@@ -141,3 +148,105 @@ def test_render_mermaid_escapes_multiline_labels():
 
     assert "tool 'quoted'" in result
     assert "first line<br/>second line" in result
+
+def test_render_mermaid_agent_tasks():
+
+    graph = WorkflowGraph(
+        workflow_id="agent-workflow",
+        agent_tasks=[
+            AgentTaskNode(
+                task_id="T1",
+                parent_task_id=None,
+                agent_id="supervisor",
+                request="Delegate research.",
+                status=AgentTaskStatus.COMPLETED,
+            ),
+            AgentTaskNode(
+                task_id="T2",
+                parent_task_id="T1",
+                agent_id="research",
+                request="Research the topic.",
+                status=AgentTaskStatus.RUNNING,
+                message_count=2,
+            ),
+        ],
+    )
+
+    result = render_mermaid(graph)
+
+    assert 'T1["T1: supervisor<br/>COMPLETED' in result
+    assert 'T2["T2: research<br/>RUNNING' in result
+    assert "Request: Delegate research." in result
+    assert "Messages: 2" in result
+    assert "class T1 agent_status_completed" in result
+    assert "class T2 agent_status_running" in result
+
+
+def test_render_mermaid_agent_relationships():
+
+    graph = WorkflowGraph(
+        workflow_id="agent-workflow",
+        agent_tasks=[
+            AgentTaskNode(
+                task_id="T1",
+                parent_task_id=None,
+                agent_id="supervisor",
+                request="Delegate.",
+                status=AgentTaskStatus.COMPLETED,
+            ),
+            AgentTaskNode(
+                task_id="T2",
+                parent_task_id="T1",
+                agent_id="research",
+                request="Research.",
+                status=AgentTaskStatus.COMPLETED,
+            ),
+        ],
+        agent_edges=[
+            AgentEdge(
+                source="T1",
+                target="T2",
+                type=AgentEdgeType.DELEGATION,
+            ),
+            AgentEdge(
+                source="T2",
+                target="S1",
+                type=AgentEdgeType.OWNERSHIP,
+            ),
+        ],
+    )
+
+    result = render_mermaid(graph)
+
+    assert "T1 -->|delegates| T2" in result
+    assert "T2 -. owns .-> S1" in result
+
+
+def test_render_mermaid_agent_step_association():
+
+    graph = WorkflowGraph(
+        workflow_id="agent-workflow",
+        agent_tasks=[
+            AgentTaskNode(
+                task_id="T2",
+                parent_task_id="T1",
+                agent_id="research",
+                request="Research.",
+                status=AgentTaskStatus.COMPLETED,
+            ),
+        ],
+        nodes=[
+            WorkflowNode(
+                id=1,
+                tool="rag",
+                status=StepStatus.SUCCESS,
+                agent_task_id="T2",
+                agent_id="research",
+            ),
+        ],
+    )
+
+    result = render_mermaid(graph)
+
+    assert "Task: T2" in result
+    assert "Agent: research" in result
