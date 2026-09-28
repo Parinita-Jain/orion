@@ -687,8 +687,7 @@ AGENT_TASK_COMPLETED
 AGENT_TASK_FAILED
 AGENT_MESSAGE
 ```
-
-These are design candidates, not yet implementation decisions.
+These event types were subsequently implemented as part of Phase 7.
 
 ---
 
@@ -762,8 +761,8 @@ Analysis Agent
     +-- Step 3
 ```
 
-The exact visualization changes are deferred until the agent execution model is
-stable.
+The visualization changes were implemented after the AgentTask execution model
+and delegation semantics were stabilized.
 
 ---
 
@@ -910,39 +909,58 @@ Verify that:
 
 ### Phase 7 - Events and Persistence
 
-After task and message semantics are stable:
+**Status: Complete**
 
-* extend event types if required
-* extend WorkflowEvent if required
-* persist AgentTasks
-* persist AgentMessages
-* test resume behavior
+Implemented:
 
-Do not add unnecessary event or persistence fields before their semantics are
-established.
+* Agent-specific workflow event types:
+  * `AGENT_TASK_CREATED`
+  * `AGENT_TASK_STARTED`
+  * `AGENT_TASK_COMPLETED`
+  * `AGENT_TASK_FAILED`
+  * `AGENT_MESSAGE`
+* `WorkflowEvent` now carries optional `agent_task_id` and `agent_id`.
+* Agent task lifecycle events are emitted through the existing `EventBus`.
+* Agent message events are emitted through the existing `EventBus`.
+* AgentTasks and AgentMessages are persisted.
+* Resume behavior remains supported.
+* Existing workflow events remain backward compatible.
 
 ---
 
 ### Phase 8 - Visualization
 
-Extend the existing visualization model to represent agent and task
-information where useful.
+**Status: Complete**
 
-Do not create a second visualization framework.
+The existing Sprint 11 visualization architecture has been extended to represent
+the multi-agent runtime.
+
+Implemented:
+
+* `AgentTaskNode`
+* AgentTask delegation relationships
+* AgentTask → PlanStep ownership relationships
+* PlanStep agent/task association
+* Agent task status and result information
+* Agent message counts
+* Mermaid rendering of AgentTasks and agent relationships
+
+The existing PlanStep dependency and replacement visualization remains intact.
+
+No second visualization framework was created.
 
 ---
 
 ### Phase 9 - Regression and Stabilization
 
-Run:
+**Status: Complete**
 
-```bat
-pytest -q
+Full regression suite:
+
+```text
+223 passed
 ```
-
-All existing tests must continue to pass.
-
-Regression areas include:
+Regression coverage includes:
 
 * Planner
 * Executor
@@ -953,8 +971,11 @@ Regression areas include:
 * Persistence
 * Resume
 * Visualization
+* Multi-agent runtime integration
+* Agent-specific events
+* Agent-aware visualization
 
-Add the multi-agent test suite alongside the existing tests.
+All existing tests continue to pass.
 
 ---
 
@@ -1072,7 +1093,7 @@ At this point the following architectural decisions are agreed:
 
 ### Current Implementation Checkpoint
 
-The following implementation work is now complete:
+The following implementation work is complete:
 
 - Agent domain model has been implemented.
 - `AgentRuntime` has been introduced as the reusable agent execution boundary.
@@ -1082,16 +1103,16 @@ The following implementation work is now complete:
 - `PlanStep` and `ExecutionRecord` carry agent-task association.
 - Planner and Replanner output are converted to the canonical runtime `PlanStep`.
 - Agent task/message persistence has been integrated.
+- Explicit agent-to-agent delegation has been implemented.
+- AgentTask completion and failure semantics have been implemented.
+- Agent-specific workflow events have been implemented.
+- Agent-aware workflow visualization has been implemented using the existing
+  visualization architecture.
 - Existing Orion execution remains the common execution engine.
-- Full regression suite currently passes with **180 tests**.
+- Backward compatibility with existing single-agent workflows has been
+  preserved where practical.
+- Full regression suite passes with **223 tests**.
 
-The following remain intentionally incomplete:
-
-- explicit agent-to-agent delegation
-- complete AgentTask completion semantics
-- agent-specific event extensions
-- agent visualization
-
-**Implementation is in progress.**
+**Sprint 12 implementation is complete.**
 
 ````
