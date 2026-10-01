@@ -64,8 +64,26 @@ class WorkflowStream(Iterator[WorkflowEvent]):
 
     @property
     def done(self) -> bool:
-        """Whether the background workflow execution has finished."""
+        if self._thread is None:
+            return True
+
         return not self._thread.is_alive()
+
+    @classmethod
+    def completed(
+        cls,
+        state: dict[str, Any],
+    ) -> WorkflowStream:
+        stream = cls.__new__(cls)
+
+        stream._queue = Queue()
+        stream._result = state
+        stream._error = None
+        stream._thread = None
+
+        stream._queue.put(_STREAM_END)
+
+        return stream
 
 
 def stream_workflow(state: dict[str, Any]) -> WorkflowStream:

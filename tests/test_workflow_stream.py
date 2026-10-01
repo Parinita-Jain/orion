@@ -161,3 +161,53 @@ def test_workflow_streams_are_isolated():
     assert second_events[0].payload == {
         "workflow_id": "workflow-2",
     }
+
+def test_stream_event_bus_isolation():
+    """Each WorkflowStream receives only events from its own EventBus."""
+
+    from unittest.mock import patch
+
+    from runtime.event import WorkflowEvent
+    from runtime.stream import stream_workflow
+    from shared_types.workflow_event_type import WorkflowEventType
+
+    state_a = {
+        "workflow_id": "stream-isolation-a",
+    }
+
+    state_b = {
+        "workflow_id": "stream-isolation-b",
+    }
+
+    event_a = WorkflowEvent(
+        type=WorkflowEventType.WORKFLOW_STARTED,
+        payload={"workflow_id": "stream-isolation-a"},
+    )
+
+    event_b = WorkflowEvent(
+        type=WorkflowEventType.WORKFLOW_STARTED,
+        payload={"workflow_id": "stream-isolation-b"},
+    )
+
+    def fake_invoke(state):
+        event_bus = state["event_bus"]
+
+        if state["workflow_id"] == "stream-isolation-a":
+            event_bus.emit(event_a)
+        else:
+            event_bus.emit(event_b)
+
+        return state
+
+    with patch("runtime.stream.app.invoke", side_effect=fake_invoke):
+        stream_a = stream_workflow(state_a)
+        stream_b = stream_workflow(state_b)
+
+        events_a = list(stream_a)
+        events_b = list(stream_b)
+
+    assert events_a == [event_a]
+    assert events_b == [event_b]
+
+    assert stream_a.result["workflow_id"] == "stream-isolation-a"
+    assert stream_b.result["workflow_id"] == "stream-isolation-b"
