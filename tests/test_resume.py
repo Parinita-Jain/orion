@@ -650,3 +650,181 @@ def test_stream_resume_replan_workflow_enters_replanner():
         Path(
             f"data/workflows/{workflow_id}.json"
         ).unlink()
+
+def test_resume_delegated_agent_task_returns_to_parent():
+    workflow_id = "delegated-agent-resume-test"
+    execution_count = 0
+
+    def research_tool(state):
+        nonlocal execution_count
+        execution_count += 1
+
+        return {
+            "messages": [],
+            "output": {
+                "research": "Persisted research result."
+            },
+            "success": True,
+            "error": None,
+        }
+
+    from agents.decision import AgentAction, AgentDecision
+    from agents.models import AgentDefinition
+    from agents.registry import (
+        clear_registry as clear_agent_registry,
+        register_agent,
+    )
+    from agents.task import AgentTask, AgentTaskStatus
+    from models.plan import PlanStep
+
+    clear_agent_registry()
+
+    register_agent(
+        AgentDefinition(
+            id="supervisor",
+            name="Supervisor Agent",
+            role="supervisor",
+            instructions="Coordinate work.",
+        )
+    )
+
+    register_agent(
+        AgentDefinition(
+            id="research",
+            name="Research Agent",
+            role="research",
+            instructions="Perform research.",
+        )
+    )
+
+    clear_registry()
+
+    register_tool(
+        Tool(
+            name="research_resume_tool",
+            function=research_tool,
+            description="Deterministic research tool for resume testing.",
+            outputs=["research"],
+        )
+    )
+
+    state = {
+        "workflow_id": workflow_id,
+        "iteration": 0,
+        "steps": [
+            PlanStep(
+                id=1,
+                tool="research_resume_tool",
+                tool_input="Research the subject.",
+                depends_on=[],
+                agent_task_id="T2",
+            )
+        ],
+        "tool_results": {},
+        "execution_records": [],
+        "messages": [
+            HumanMessage(content="Research the assigned subject.")
+        ],
+        "context": {},
+        "output": {},
+        "done": False,
+        "error": None,
+        "errors": [],
+        "completion_status": None,
+        "runtime_config": RuntimeConfig(),
+        "agent_tasks": {
+            "T1": AgentTask(
+                task_id="T1",
+                parent_task_id=None,
+                agent_id="supervisor",
+                request="Research the assigned subject.",
+                status=AgentTaskStatus.ASSIGNED,
+            ),
+            "T2": AgentTask(
+                task_id="T2",
+                parent_task_id="T1",
+                agent_id="research",
+                request="Research the assigned subject.",
+                status=AgentTaskStatus.RUNNING,
+            ),
+        },
+        "agent_messages": [],
+        "current_agent_task_id": "T2",
+    }
+
+    decisions = [
+        AgentDecision(
+            action=AgentAction.COMPLETE,
+            result={
+                "answer": "Research completed after resume."
+            },
+        ),
+        AgentDecision(
+            action=AgentAction.COMPLETE,
+            result={
+                "answer": "Final answer after resume."
+            },
+        ),
+    ]
+
+    try:
+        save_workflow(workflow_id, state)
+
+        with patch(
+            "agents.runtime.AgentRuntime.decide_task",
+            side_effect=decisions,
+        ), patch(
+            "langchain_core.language_models.BaseChatModel.invoke"
+        ) as mock_llm:
+
+            mock_llm.return_value.content = (
+                "Final synthesized response."
+            )
+
+            from workflow.resume import resume_workflow
+
+            result = resume_workflow(workflow_id)
+
+        assert execution_count == 1
+        assert result["error"] is None
+
+        assert result["agent_tasks"]["T2"].status == (
+            AgentTaskStatus.COMPLETED
+        )
+        assert result["agent_tasks"]["T1"].status == (
+            AgentTaskStatus.COMPLETED
+        )
+
+        assert result["agent_tasks"]["T2"].result == {
+            "answer": "Research completed after resume."
+        }
+
+        assert result["agent_tasks"]["T1"].metadata["child_results"] == [
+            {
+                "task_id": "T2",
+                "agent_id": "research",
+                "request": "Research the assigned subject.",
+                "result": {
+                    "answer": "Research completed after resume."
+                },
+            }
+        ]
+
+        assert result["current_agent_task_id"] == "T1"
+
+        assert result["tool_results"][1]["success"] is True
+        assert (
+            result["tool_results"][1]["output"]["research"]
+            == "Persisted research result."
+        )
+
+        assert result["messages"][-1].content == (
+            "Final synthesized response."
+        )
+
+    finally:
+        Path(
+            f"data/workflows/{workflow_id}.json"
+        ).unlink(missing_ok=True)
+        clear_registry()
+        clear_agent_registry()
