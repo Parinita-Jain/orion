@@ -763,3 +763,96 @@ def test_compiled_graph_executes_weather_tool_end_to_end():
     assert result["messages"][-1].content == (
         "The weather indicates that you should carry a raincoat."
     )
+
+def test_agent_interprets_tool_result_before_completing():
+
+    from models.plan import PlanStep
+
+    event_bus = EventBus()
+
+    from registry import clear_registry as clear_tool_registry
+    import tools
+    import importlib
+
+    clear_tool_registry()
+    importlib.reload(tools)
+
+    decisions = [
+        AgentDecision(
+            action=AgentAction.PLAN,
+        ),
+        AgentDecision(
+            action=AgentAction.COMPLETE,
+            result={
+                "answer": "Carry a raincoat because precipitation probability is 56%."
+            },
+        ),
+    ]
+
+    planned_step = PlanStep(
+        id=1,
+        tool="weather",
+        tool_input="Mumbai, India",
+        depends_on=[],
+        agent_task_id="T1",
+    )
+
+    captured_context = []
+
+    def fake_decide_task(
+        self,
+        task,
+        decision_context=None,
+        allow_delegation=True,
+    ):
+        captured_context.append(decision_context)
+        return decisions.pop(0)
+
+    with (
+        patch(
+            "agents.runtime.AgentRuntime.decide_task",
+            new=fake_decide_task,
+        ),
+        patch(
+            "agents.runtime.AgentRuntime.plan_task",
+            return_value=[planned_step],
+        ),
+    ):
+
+        state = {
+            "workflow_id": "agent-tool-result-test",
+            "messages": [
+                HumanMessage(
+                    content="Should I carry a raincoat in Mumbai today?"
+                )
+            ],
+            "agent_tasks": {},
+            "agent_messages": [],
+            "current_agent_task_id": None,
+            "steps": [],
+            "tool_results": {},
+            "execution_records": [],
+            "context": {},
+            "output": {},
+            "runtime_config": RuntimeConfig(),
+            "event_bus": event_bus,
+            "error": None,
+            "done": False,
+        }
+
+        result = app.invoke(state)
+
+    assert result["error"] is None
+
+    assert len(captured_context) == 2
+
+    second_context = captured_context[1]
+
+    assert "Tool: weather" in second_context
+    assert "Status: StepStatus.SUCCESS" in second_context
+    assert "Success: True" in second_context
+    assert "precipitation_probability" in second_context
+
+    assert result["agent_tasks"]["T1"].status == (
+        AgentTaskStatus.COMPLETED
+    )

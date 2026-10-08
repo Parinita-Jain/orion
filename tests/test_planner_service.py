@@ -93,7 +93,50 @@ def test_valid_llm_plan():
     assert steps[0].tool == "llm"
     assert steps[0].tool_input == "Explain AI"
 
+def test_planner_prompt_contains_registered_weather_tool():
 
+    fake_llm = Mock()
+
+    fake_llm.invoke.return_value = type(
+        "PlannerResult",
+        (),
+        {
+            "steps": [
+                type(
+                    "PlannerStep",
+                    (),
+                    {
+                        "id": 1,
+                        "tool": "weather",
+                        "tool_input": "Mumbai, India",
+                        "depends_on": [],
+                        "output": None,
+                        "approval": None,
+                        "condition": None,
+                        "replaces": None,
+                    },
+                )()
+            ]
+        },
+    )()
+
+    service = PlanningService(
+        get_structured_llm=lambda: fake_llm,
+    )
+
+    service.plan(
+        "Should I carry a raincoat in Mumbai today?"
+    )
+
+    prompt = fake_llm.invoke.call_args.args[0]
+
+    assert "weather" in prompt
+    assert "current weather" in prompt
+    assert "precipitation" in prompt
+    assert "Mumbai" in prompt
+    assert "tool names" in prompt
+
+    
 def test_llm_failure_raises_orion_error():
 
     fake_llm = Mock()
