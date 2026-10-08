@@ -1,5 +1,5 @@
 from models.execution_record import ExecutionRecord
-from schemas import PlanStep
+from schemas import PlannerStep
 from shared_types.completion_status import CompletionStatus
 from shared_types.step_status import StepStatus
 from visualization import build_workflow_graph, render_mermaid
@@ -11,25 +11,25 @@ def test_workflow_state_to_mermaid():
         "workflow_id": "integration-workflow",
         "completion_status": CompletionStatus.COMPLETE,
         "steps": [
-            PlanStep(
+            PlannerStep(
                 id=1,
                 tool="rag",
                 tool_input="research",
                 depends_on=[],
             ),
-            PlanStep(
+            PlannerStep(
                 id=2,
                 tool="calculator",
                 tool_input="#1.value",
                 depends_on=[1],
             ),
-            PlanStep(
+            PlannerStep(
                 id=3,
                 tool="direct",
                 tool_input="independent task",
                 depends_on=[],
             ),
-            PlanStep(
+            PlannerStep(
                 id=4,
                 tool="replacement_tool",
                 tool_input="fallback",

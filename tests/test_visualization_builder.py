@@ -5,7 +5,7 @@ from agents.task import (
 )
 from models.execution_record import ExecutionRecord
 from models.plan import PlanStep as RuntimePlanStep
-from schemas import PlanStep
+from schemas import PlannerStep
 from shared_types.completion_status import CompletionStatus
 from shared_types.step_status import StepStatus
 from visualization.builder import build_workflow_graph
@@ -18,13 +18,13 @@ def test_builder_creates_nodes_and_dependency_edges():
         "workflow_id": "workflow-1",
         "completion_status": CompletionStatus.COMPLETE,
         "steps": [
-            PlanStep(
+            PlannerStep(
                 id=1,
                 tool="rag",
                 tool_input="question",
                 depends_on=[],
             ),
-            PlanStep(
+            PlannerStep(
                 id=2,
                 tool="calculator",
                 tool_input="#1.value",
@@ -91,13 +91,13 @@ def test_builder_creates_replacement_edge():
     state = {
         "workflow_id": "workflow-2",
         "steps": [
-            PlanStep(
+            PlannerStep(
                 id=1,
                 tool="bad_tool",
                 tool_input="input",
                 depends_on=[],
             ),
-            PlanStep(
+            PlannerStep(
                 id=2,
                 tool="replacement_tool",
                 tool_input="input",
@@ -139,7 +139,7 @@ def test_builder_handles_pending_step_without_execution_history():
     state = {
         "workflow_id": "workflow-3",
         "steps": [
-            PlanStep(
+            PlannerStep(
                 id=1,
                 tool="calculator",
                 tool_input="2+2",

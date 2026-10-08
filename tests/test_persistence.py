@@ -21,7 +21,6 @@ from langchain_core.messages import HumanMessage, AIMessage
 from unittest.mock import patch
 from executor.node import executor_node
 from runtime.runtime_config import RuntimeConfig
-from models.plan import PlanStep
 
 from shared_types.step_status import StepStatus
 from shared_types.failure_reason import FailureReason
@@ -35,7 +34,7 @@ from workflow.completion import completion_node
 
 from schemas import ReplannerOutput
 from replanner import replanner_node
-from schemas import PlanStep as ReplannerPlanStep
+from schemas import PlannerStep
 
 from errors import OrionError, ErrorType
 
@@ -2067,7 +2066,7 @@ def test_replacement_step_survives_restart(mock_llm):
             return ReplannerOutput(
                 done=False,
                 steps=[
-                    ReplannerPlanStep(
+                    PlannerStep(
                         id=3,
                         tool="replacement_tool",
                         tool_input="Retry Step 2",

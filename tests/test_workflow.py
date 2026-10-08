@@ -8,7 +8,7 @@ from registry import Tool
 from planner import planner_node
 from executor.node import executor_node
 from registry import register_tool, clear_registry
-from schemas import PlannerOutput, PlanStep
+from schemas import PlannerOutput, PlannerStep
 
 from shared_types.step_status import StepStatus
 from runtime.runtime_config import RuntimeConfig
@@ -35,7 +35,7 @@ class FakeLLMSingleStep:
 
         return PlannerOutput(
             steps=[
-                PlanStep(
+                PlannerStep(
                     id=1,
                     tool="echo",
                     tool_input="Hello Orion",
@@ -50,13 +50,13 @@ class FakeLLMMultiStep:
 
         return PlannerOutput(
             steps=[
-                PlanStep(
+                PlannerStep(
                     id=1,
                     tool="echo",
                     tool_input="Hello Orion",
                     depends_on=[]
                 ),
-                PlanStep(
+                PlannerStep(
                     id=2,
                     tool="echo",
                     tool_input="Repeat: #1.answer",
@@ -71,19 +71,19 @@ class FakeLLMParallel:
 
         return PlannerOutput(
             steps=[
-                PlanStep(
+                PlannerStep(
                     id=1,
                     tool="echo",
                     tool_input="Apple",
                     depends_on=[]
                 ),
-                PlanStep(
+                PlannerStep(
                     id=2,
                     tool="echo",
                     tool_input="Banana",
                     depends_on=[]
                 ),
-                PlanStep(
+                PlannerStep(
                     id=3,
                     tool="combine",
                     tool_input="#1.answer + #2.answer",
@@ -98,19 +98,19 @@ class FakeLLMFailure:
 
         return PlannerOutput(
             steps=[
-                PlanStep(
+                PlannerStep(
                     id=1,
                     tool="echo",
                     tool_input="Apple",
                     depends_on=[]
                 ),
-                PlanStep(
+                PlannerStep(
                     id=2,
                     tool="fail",
                     tool_input="Boom",
                     depends_on=[]
                 ),
-                PlanStep(
+                PlannerStep(
                     id=3,
                     tool="combine",
                     tool_input="#1.answer + #2.answer",

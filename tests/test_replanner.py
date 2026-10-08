@@ -19,7 +19,7 @@ from replanner import replanner_node
 
 from schemas import (
     ReplannerOutput,
-    PlanStep,
+    PlannerStep,
 )
 
 
@@ -33,7 +33,7 @@ def test_replanner_adds_new_steps(mock_llm):
             return ReplannerOutput(
                 done=False,
                 steps=[
-                    PlanStep(
+                    PlannerStep(
                         id=2,
                         tool="llm",
                         tool_input="Summarize the answer",
@@ -52,7 +52,7 @@ def test_replanner_adds_new_steps(mock_llm):
             )
         ],
         "steps": [
-            PlanStep(
+            PlannerStep(
                 id=1,
                 tool="rag",
                 tool_input="Explain RAG",
@@ -101,7 +101,7 @@ def test_replanner_returns_done_when_work_is_complete(mock_llm):
             )
         ],
         "steps": [
-            PlanStep(
+            PlannerStep(
                 id=1,
                 tool="rag",
                 tool_input="Explain RAG",

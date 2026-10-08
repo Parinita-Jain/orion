@@ -1,6 +1,8 @@
 import pytest
 
-from schemas import PlanStep, ApprovalConfig
+from schemas import PlannerStep, ApprovalConfig
+
+from validation import validate_plan
 
 from registry import Tool, clear_registry, register_tool
 from validation import validate_plan
@@ -41,13 +43,13 @@ def test_empty_plan():
 def test_valid_plan():
 
     steps = [
-        PlanStep(
+        PlannerStep(
             id=1,
             tool="dummy",
             tool_input="",
             depends_on=[],
         ),
-        PlanStep(
+        PlannerStep(
             id=2,
             tool="dummy",
             tool_input="",
@@ -61,13 +63,13 @@ def test_valid_plan():
 def test_duplicate_step_id():
 
     steps = [
-        PlanStep(
+        PlannerStep(
                     id=1,
                     tool="dummy",
                     tool_input="",
                     depends_on=[],
                 ),
-        PlanStep(
+        PlannerStep(
                     id=1,
                     tool="dummy",
                     tool_input="",
@@ -83,7 +85,7 @@ def test_duplicate_step_id():
 def test_unknown_tool():
 
     steps = [
-                    PlanStep(
+                    PlannerStep(
                 id=1,
                 tool="unknown",
                 tool_input="",
@@ -99,7 +101,7 @@ def test_unknown_tool():
 def test_missing_dependency():
 
     steps = [
-        PlanStep(
+        PlannerStep(
             id=1,
             tool="dummy",
             tool_input="",
@@ -115,7 +117,7 @@ def test_missing_dependency():
 def test_self_dependency():
 
     steps = [
-        PlanStep(
+        PlannerStep(
             id=1,
             tool="dummy",
             tool_input="",
@@ -131,13 +133,13 @@ def test_self_dependency():
 def test_future_dependency():
 
     steps = [
-        PlanStep(
+        PlannerStep(
             id=1,
             tool="dummy",
             tool_input="",
             depends_on=[2],
         ),
-        PlanStep(
+        PlannerStep(
             id=2,
             tool="dummy",
             tool_input="",
@@ -153,13 +155,13 @@ def test_future_dependency():
 def test_non_sequential_step_ids():
 
     steps = [
-                PlanStep(
+                PlannerStep(
                     id=1,
                     tool="dummy",
                     tool_input="",
                     depends_on=[],
                 ),
-                PlanStep(
+                PlannerStep(
                     id=3,
                     tool="dummy",
                     tool_input="",
@@ -171,14 +173,10 @@ def test_non_sequential_step_ids():
 
     assert "Expected step id 2, found 3" in errors
 
-from schemas import PlanStep, ApprovalConfig
-from validation import validate_plan
-
-
 def test_validate_plan_requires_approval_reason():
 
     steps = [
-        PlanStep(
+        PlannerStep(
             id=1,
             tool="llm",
             tool_input="Hello",

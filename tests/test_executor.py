@@ -1,6 +1,7 @@
 import pytest
 import models.plan
 
+from unittest.mock import patch
 from langchain_core.messages import AIMessage
 
 from models.plan import PlanStep
@@ -1496,3 +1497,83 @@ def test_execute_step_records_retries_on_success_after_retry():
     assert attempts == 2
     assert result["result"]["success"] is True
     assert result["record"].retries == 1
+
+def test_executor_weather_tool():
+
+    import tools
+    import importlib
+
+    clear_registry()
+    importlib.reload(tools)
+
+    step = PlanStep(
+        id=1,
+        tool="weather",
+        tool_input="Mumbai, India",
+        depends_on=[],
+    )
+
+    state = make_state(steps=[step])
+
+    geocoding_response = {
+        "results": [
+            {
+                "name": "Mumbai",
+                "country": "India",
+                "latitude": 19.07283,
+                "longitude": 72.88261,
+            }
+        ]
+    }
+
+    forecast_response = {
+        "timezone": "Asia/Kolkata",
+        "current": {
+            "temperature_2m": 33.2,
+            "weather_code": 0,
+            "precipitation": 0,
+            "rain": 0,
+        },
+        "hourly": {
+            "time": [
+                "2026-10-06T12:00",
+                "2026-10-06T13:00",
+            ],
+            "precipitation_probability": [10, 56],
+        },
+    }
+
+    class FakeResponse:
+
+        def __init__(self, data):
+            self._data = data
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return self._data
+
+    responses = [
+        FakeResponse(geocoding_response),
+        FakeResponse(forecast_response),
+    ]
+
+    with patch("tools.weather.httpx.Client") as mock_client:
+        client = mock_client.return_value.__enter__.return_value
+        client.get.side_effect = responses
+
+        result = executor_node(state)
+
+    tool_result = result["tool_results"][1]
+
+    assert tool_result["success"] is True
+    assert tool_result["output"]["location"] == "Mumbai"
+    assert tool_result["output"]["country"] == "India"
+    assert (
+        tool_result["output"]["today"]["max_precipitation_probability"]
+        == 56
+    )
+
+    assert result["execution_records"][0].tool == "weather"
+    assert result["execution_records"][0].success is True

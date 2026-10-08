@@ -5,7 +5,7 @@ from langchain_core.messages import HumanMessage
 from unittest.mock import patch
 
 from schemas import (
-    PlanStep,
+    PlannerStep,
     ReplannerOutput,
 )
 
@@ -22,7 +22,7 @@ def test_dynamic_replanning_workflow(mock_llm):
             return ReplannerOutput(
                 done=False,
                 steps=[
-                    PlanStep(
+                    PlannerStep(
                         id=3,
                         tool="llm",
                         tool_input="Summarize the final answer",
@@ -42,13 +42,13 @@ def test_dynamic_replanning_workflow(mock_llm):
             )
         ],
         "steps": [
-            PlanStep(
+            PlannerStep(
                 id=1,
                 tool="rag",
                 tool_input="Explain RAG",
                 depends_on=[],
             ),
-            PlanStep(
+            PlannerStep(
                 id=2,
                 tool="llm",
                 tool_input="Summarize #1.answer",

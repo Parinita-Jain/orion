@@ -10,7 +10,7 @@ class ApprovalConfig(BaseModel):
 
     role: str | None = None
 
-class PlanStep(BaseModel):
+class PlannerStep(BaseModel):
 
     id: int
 
@@ -30,10 +30,10 @@ class PlanStep(BaseModel):
 
 class PlannerOutput(BaseModel):
 
-    steps: list[PlanStep]
+    steps: list[PlannerStep]
 
 class ReplannerOutput(BaseModel):
 
     done: bool
 
-    steps: list[PlanStep]
+    steps: list[PlannerStep]

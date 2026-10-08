@@ -4,6 +4,7 @@ from .calculator import calculator_node
 from .greeting import greeting_tool
 from .llm import llm_tool
 from .rag import rag_tool
+from .weather import weather_tool
 
 print("Loading tools package...")
 
@@ -43,3 +44,18 @@ register_tool(
     )
 )
 
+register_tool(
+    Tool(
+        name="weather",
+        function=weather_tool,
+        description=(
+            "Get current weather and today's precipitation "
+            "probability for a specified location."
+        ),
+        outputs=[
+            "location",
+            "current",
+            "precipitation_probability",
+        ],
+    )
+)

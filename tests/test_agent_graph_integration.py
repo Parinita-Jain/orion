@@ -12,6 +12,8 @@ from agents.registry import (
     register_agent,
 )
 
+from workflow.graph import app
+
 from agents.models import AgentDefinition
 
 from agents.task import AgentTaskStatus
@@ -24,6 +26,7 @@ from shared_types.workflow_event_type import WorkflowEventType
 
 from workflow.graph import app
 
+import planner.node as planner_node_module
 
 def setup_function():
     clear_registry()
@@ -604,3 +607,159 @@ def test_compiled_graph_supports_nested_delegation():
         WorkflowEventType.AGENT_MESSAGE,
         WorkflowEventType.AGENT_TASK_COMPLETED,
     ]
+
+def test_compiled_graph_executes_weather_tool_end_to_end():
+
+    listener = FakeListener()
+
+    event_bus = EventBus()
+    event_bus.subscribe(listener)
+
+    from registry import clear_registry as clear_tool_registry
+    import tools
+
+    clear_tool_registry()
+    import importlib
+    importlib.reload(tools)
+
+    decisions = [
+        AgentDecision(
+            action=AgentAction.PLAN,
+        ),
+        AgentDecision(
+            action=AgentAction.COMPLETE,
+            result={
+                "answer": "The weather indicates that you should carry a raincoat."
+            },
+        ),
+    ]
+
+    geocoding_response = {
+        "results": [
+            {
+                "name": "Mumbai",
+                "country": "India",
+                "latitude": 19.07283,
+                "longitude": 72.88261,
+            }
+        ]
+    }
+
+    forecast_response = {
+        "timezone": "Asia/Kolkata",
+        "current": {
+            "temperature_2m": 33.2,
+            "weather_code": 0,
+            "precipitation": 0,
+            "rain": 0,
+        },
+        "hourly": {
+            "time": [
+                "2026-10-06T12:00",
+                "2026-10-06T13:00",
+            ],
+            "precipitation_probability": [10, 56],
+        },
+    }
+
+    class FakeResponse:
+
+        def __init__(self, data):
+            self._data = data
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return self._data
+
+    responses = [
+        FakeResponse(geocoding_response),
+        FakeResponse(forecast_response),
+    ]
+
+    from models.plan import PlanStep
+
+    planned_step = PlanStep(
+        id=1,
+        tool="weather",
+        tool_input="Mumbai, India",
+        depends_on=[],
+        agent_task_id="T1",
+    )
+
+    try:
+        with (
+            patch(
+                "agents.runtime.AgentRuntime.decide_task",
+                side_effect=decisions,
+            ),
+            patch(
+                "agents.runtime.AgentRuntime.plan_task",
+                return_value=[planned_step],
+            ),
+            patch(
+                "tools.weather.httpx.Client",
+            ) as mock_client,
+            patch(
+                "langchain_core.language_models.BaseChatModel.invoke",
+            ) as mock_llm,
+        ):
+            client = mock_client.return_value.__enter__.return_value
+            client.get.side_effect = responses
+
+            mock_llm.return_value.content = (
+                "The weather indicates that you should carry a raincoat."
+            )
+
+            state = {
+                "workflow_id": "weather-integration-test",
+                "messages": [
+                    HumanMessage(
+                        content="Should I carry a raincoat in Mumbai today?"
+                    )
+                ],
+                "agent_tasks": {},
+                "agent_messages": [],
+                "current_agent_task_id": None,
+                "steps": [],
+                "tool_results": {},
+                "execution_records": [],
+                "context": {},
+                "output": {},
+                "runtime_config": RuntimeConfig(),
+                "event_bus": event_bus,
+                "error": None,
+                "done": False,
+            }
+
+            result = app.invoke(state)
+
+    finally:
+        clear_tool_registry()
+
+    assert result["error"] is None
+
+    assert len(result["steps"]) == 1
+
+    step = result["steps"][0]
+    assert step.tool == "weather"
+
+    assert 1 in result["tool_results"]
+
+    weather_result = result["tool_results"][1]
+
+    assert weather_result["success"] is True
+    assert weather_result["output"]["location"] == "Mumbai"
+    assert weather_result["output"]["country"] == "India"
+    assert (
+        weather_result["output"]["today"]["max_precipitation_probability"]
+        == 56
+    )
+
+    assert result["execution_records"][0].tool == "weather"
+    assert result["execution_records"][0].success is True
+
+    assert result["messages"][-1].content == (
+        "The weather indicates that you should carry a raincoat."
+    )

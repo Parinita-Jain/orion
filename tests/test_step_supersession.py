@@ -16,7 +16,7 @@ from runtime.runtime_config import RuntimeConfig
 from runtime.event_bus import EventBus
 
 from schemas import (
-    PlanStep,
+    PlannerStep,
     ReplannerOutput,
 )
 
@@ -76,7 +76,7 @@ def test_step_supersession(mock_llm):
             return ReplannerOutput(
                 done=False,
                 steps=[
-                    PlanStep(
+                    PlannerStep(
                         id=3,
                         tool="dummy",
                         tool_input="Retry",
@@ -96,13 +96,13 @@ def test_step_supersession(mock_llm):
             )
         ],
         steps=[
-            PlanStep(
+            PlannerStep(
                 id=1,
                 tool="dummy",
                 tool_input="Explain RAG",
                 depends_on=[],
             ),
-            PlanStep(
+            PlannerStep(
                 id=2,
                 tool="dummy",
                 tool_input="Summarize",

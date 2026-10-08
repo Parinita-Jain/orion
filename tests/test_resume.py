@@ -6,7 +6,7 @@ from langchain_core.messages import HumanMessage
 from persistence import load_workflow, save_workflow
 from runtime.event_bus import EventBus
 from runtime.runtime_config import RuntimeConfig
-from schemas import PlanStep, ReplannerOutput
+from schemas import PlannerStep, ReplannerOutput
 from registry import Tool, clear_registry, register_tool
 from shared_types.completion_status import CompletionStatus
 from shared_types.failure_reason import FailureReason
@@ -49,13 +49,13 @@ def test_resume_workflow_continues_persisted_workflow():
         "workflow_id": workflow_id,
         "iteration": 0,
         "steps": [
-            PlanStep(
+            PlannerStep(
                 id=1,
                 tool="calculator",
                 tool_input="1",
                 depends_on=[],
             ),
-            PlanStep(
+            PlannerStep(
                 id=2,
                 tool="calculator",
                 tool_input="2",
@@ -135,7 +135,7 @@ def test_resume_completed_workflow_does_not_execute_again():
         "workflow_id": workflow_id,
         "iteration": 1,
         "steps": [
-            PlanStep(
+            PlannerStep(
                 id=1,
                 tool="completed_tool",
                 tool_input="run",
@@ -244,7 +244,7 @@ def test_resume_replan_workflow_enters_replanner():
         "workflow_id": workflow_id,
         "iteration": 0,
         "steps": [
-            PlanStep(
+            PlannerStep(
                 id=1,
                 tool="temporary_tool",
                 tool_input="run",
@@ -275,7 +275,7 @@ def test_resume_replan_workflow_enters_replanner():
     replanner_output = ReplannerOutput(
         done=False,
         steps=[
-            PlanStep(
+            PlannerStep(
                 id=2,
                 tool="replacement_tool",
                 tool_input="run replacement",
@@ -352,13 +352,13 @@ def test_stream_resume_workflow_continues_persisted_workflow():
         "workflow_id": workflow_id,
         "iteration": 0,
         "steps": [
-            PlanStep(
+            PlannerStep(
                 id=1,
                 tool="calculator",
                 tool_input="1",
                 depends_on=[],
             ),
-            PlanStep(
+            PlannerStep(
                 id=2,
                 tool="calculator",
                 tool_input="2",
@@ -450,7 +450,7 @@ def test_stream_resume_completed_workflow_does_not_execute_again():
         "workflow_id": workflow_id,
         "iteration": 1,
         "steps": [
-            PlanStep(
+            PlannerStep(
                 id=1,
                 tool="completed_stream_tool",
                 tool_input="run",
@@ -561,7 +561,7 @@ def test_stream_resume_replan_workflow_enters_replanner():
         "workflow_id": workflow_id,
         "iteration": 0,
         "steps": [
-            PlanStep(
+            PlannerStep(
                 id=1,
                 tool="temporary_stream_tool",
                 tool_input="run",
@@ -594,7 +594,7 @@ def test_stream_resume_replan_workflow_enters_replanner():
     replanner_output = ReplannerOutput(
         done=False,
         steps=[
-            PlanStep(
+            PlannerStep(
                 id=2,
                 tool="replacement_stream_tool",
                 tool_input="run replacement",

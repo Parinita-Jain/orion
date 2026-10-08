@@ -10,7 +10,7 @@ from planner import planner_node, MAX_REPAIR_ATTEMPTS
 
 from unittest.mock import patch
 
-from schemas import PlannerOutput, PlanStep, ApprovalConfig
+from schemas import PlannerOutput, PlannerStep, ApprovalConfig
 
 from registry import clear_registry
 from runtime.approval_request import ApprovalRequest
@@ -102,7 +102,7 @@ def test_valid_llm_plan():
 
     planner_output = PlannerOutput(
         steps=[
-            PlanStep(
+            PlannerStep(
                 id=1,
                 tool="llm",
                 tool_input="Explain AI",
@@ -134,11 +134,50 @@ def test_valid_llm_plan():
     assert result["steps"][0].tool_input == "Explain AI"
     assert result["error"] is None
 
+def test_valid_weather_plan():
+
+    planner_output = PlannerOutput(
+        steps=[
+            PlannerStep(
+                id=1,
+                tool="weather",
+                tool_input="Mumbai, India",
+                depends_on=[],
+            )
+        ]
+    )
+
+    class FakeStructuredLLM:
+
+        def invoke(self, prompt):
+            return planner_output
+
+    with patch(
+        "planner.node.get_structured_llm",
+        return_value=FakeStructuredLLM(),
+    ):
+
+        state = {
+            "messages": [
+                HumanMessage(
+                    content="Should I carry a raincoat in Mumbai today?"
+                )
+            ]
+        }
+
+        result = planner_node(state)
+
+    assert len(result["steps"]) == 1
+    assert result["steps"][0].tool == "weather"
+    assert result["steps"][0].tool_input == "Mumbai, India"
+    assert result["steps"][0].depends_on == []
+    assert result["error"] is None
+
 def test_planner_repairs_invalid_plan():
 
     invalid_plan = PlannerOutput(
         steps=[
-            PlanStep(
+            PlannerStep(
                 id=1,
                 tool="unknown_tool",
                 tool_input="Explain AI",
@@ -149,7 +188,7 @@ def test_planner_repairs_invalid_plan():
 
     repaired_plan = PlannerOutput(
         steps=[
-            PlanStep(
+            PlannerStep(
                 id=1,
                 tool="llm",
                 tool_input="Explain AI",
@@ -198,7 +237,7 @@ def test_planner_repair_failure():
 
     invalid_plan = PlannerOutput(
         steps=[
-            PlanStep(
+            PlannerStep(
                 id=1,
                 tool="unknown_tool",
                 tool_input="Explain AI",
@@ -240,13 +279,13 @@ def test_valid_multistep_llm_plan():
 
     planner_output = PlannerOutput(
         steps=[
-            PlanStep(
+            PlannerStep(
                 id=1,
                 tool="rag",
                 tool_input="Explain RAG",
                 depends_on=[]
             ),
-            PlanStep(
+            PlannerStep(
                 id=2,
                 tool="llm",
                 tool_input="Summarize #1.answer",
@@ -296,7 +335,7 @@ def test_planner_creates_approval_request(mock_llm):
 
             return PlannerOutput(
                 steps=[
-                    PlanStep(
+                    PlannerStep(
                         id=1,
                         tool="llm",
                         tool_input="Hello",
@@ -345,7 +384,7 @@ def test_planner_without_approval(mock_llm):
 
             return PlannerOutput(
                 steps=[
-                    PlanStep(
+                    PlannerStep(
                         id=1,
                         tool="llm",
                         tool_input="Hello",
@@ -378,20 +417,20 @@ def test_planner_supports_branching(mock_llm):
 
             return PlannerOutput(
                 steps=[
-                    PlanStep(
+                    PlannerStep(
                         id=1,
                         tool="llm",
                         tool_input="Check eligibility",
                         depends_on=[],
                     ),
-                    PlanStep(
+                    PlannerStep(
                         id=2,
                         tool="llm",
                         tool_input="Approve loan",
                         depends_on=[1],
                         condition="#1.answer == 'yes'",
                     ),
-                    PlanStep(
+                    PlannerStep(
                         id=3,
                         tool="llm",
                         tool_input="Reject loan",
@@ -435,20 +474,20 @@ def test_planner_generates_mutually_exclusive_branches(mock_llm):
 
             return PlannerOutput(
                 steps=[
-                    PlanStep(
+                    PlannerStep(
                         id=1,
                         tool="llm",
                         tool_input="Check loan eligibility",
                         depends_on=[],
                     ),
-                    PlanStep(
+                    PlannerStep(
                         id=2,
                         tool="llm",
                         tool_input="Approve loan",
                         depends_on=[1],
                         condition="#1.answer == 'eligible'",
                     ),
-                    PlanStep(
+                    PlannerStep(
                         id=3,
                         tool="llm",
                         tool_input="Reject loan",
