@@ -57,3 +57,81 @@ def test_execute_workflow_failure(mock_invoke):
 
     assert response.status_code == 500
     assert response.json()["detail"] == "Workflow execution failed."
+
+
+@patch("api.main.workflow_app.invoke")
+def test_execute_workflow_uses_independent_state_for_each_request(mock_invoke):
+    from langchain_core.messages import AIMessage
+
+    captured_states = []
+
+    def fake_invoke(state):
+        captured_states.append(state)
+        return {"messages": [AIMessage(content="Test response")]}
+
+    mock_invoke.side_effect = fake_invoke
+
+    response1 = client.post(
+        "/workflow",
+        json={"question": "First question"},
+    )
+    response2 = client.post(
+        "/workflow",
+        json={"question": "Second question"},
+    )
+
+    assert response1.status_code == 200
+    assert response2.status_code == 200
+
+    assert response1.json()["workflow_id"] != response2.json()["workflow_id"]
+
+    assert len(captured_states) == 2
+    state1, state2 = captured_states
+
+    assert state1 is not state2
+    assert state1["messages"] is not state2["messages"]
+    assert state1["event_bus"] is not state2["event_bus"]
+    assert state1["tool_results"] is not state2["tool_results"]
+    assert state1["workflow_id"] != state2["workflow_id"]
+
+    assert state1["messages"][0].content == "First question"
+    assert state2["messages"][0].content == "Second question"
+
+
+@patch("api.main.workflow_app.invoke")
+def test_execute_workflow_uses_independent_state_for_each_request(mock_invoke):
+    from langchain_core.messages import AIMessage
+
+    captured_states = []
+
+    def fake_invoke(state):
+        captured_states.append(state)
+        return {"messages": [AIMessage(content="Test response")]}
+
+    mock_invoke.side_effect = fake_invoke
+
+    response1 = client.post(
+        "/workflow",
+        json={"question": "First question"},
+    )
+    response2 = client.post(
+        "/workflow",
+        json={"question": "Second question"},
+    )
+
+    assert response1.status_code == 200
+    assert response2.status_code == 200
+
+    assert response1.json()["workflow_id"] != response2.json()["workflow_id"]
+
+    assert len(captured_states) == 2
+    state1, state2 = captured_states
+
+    assert state1 is not state2
+    assert state1["messages"] is not state2["messages"]
+    assert state1["event_bus"] is not state2["event_bus"]
+    assert state1["tool_results"] is not state2["tool_results"]
+    assert state1["workflow_id"] != state2["workflow_id"]
+
+    assert state1["messages"][0].content == "First question"
+    assert state2["messages"][0].content == "Second question"
