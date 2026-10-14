@@ -15,13 +15,17 @@ _STREAM_END = object()
 class WorkflowStream(Iterator[WorkflowEvent]):
     """Stream WorkflowEvents while a workflow executes in the background."""
 
-    def __init__(self, state: dict[str, Any]):
+    def __init__(
+        self,
+        state: dict[str, Any],
+        event_bus: EventBus | None = None,
+    ):
         self._queue: Queue[WorkflowEvent | object] = Queue()
         self._result: dict[str, Any] | None = None
         self._error: BaseException | None = None
 
         execution_state = dict(state)
-        event_bus = EventBus()
+        event_bus = event_bus or EventBus()
         event_bus.subscribe(self._queue.put)
         execution_state["event_bus"] = event_bus
 
@@ -85,7 +89,9 @@ class WorkflowStream(Iterator[WorkflowEvent]):
 
         return stream
 
-
-def stream_workflow(state: dict[str, Any]) -> WorkflowStream:
+def stream_workflow(
+    state: dict[str, Any],
+    event_bus: EventBus | None = None,
+) -> WorkflowStream:
     """Execute a workflow while yielding its runtime WorkflowEvents."""
-    return WorkflowStream(state)
+    return WorkflowStream(state, event_bus=event_bus)
