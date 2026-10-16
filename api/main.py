@@ -78,6 +78,12 @@ def execute_workflow(request: WorkflowRequest):
 
     try:
         result = workflow_app.invoke(state)
+        
+        if result.get("error") is not None:
+            raise HTTPException(
+                status_code=500,
+                detail="Workflow execution failed.",
+            )
 
         messages = result.get("messages", [])
 
@@ -93,6 +99,9 @@ def execute_workflow(request: WorkflowRequest):
             workflow_id=workflow_id,
             answer=answer,
         )
+
+    except HTTPException:
+        raise
 
     except Exception as exc:
         raise HTTPException(

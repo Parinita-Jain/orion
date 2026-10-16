@@ -764,8 +764,8 @@ def test_compiled_graph_executes_weather_tool_end_to_end():
         "The weather indicates that you should carry a raincoat."
     )
 
-def test_agent_interprets_tool_result_before_completing():
 
+def test_agent_interprets_tool_result_before_completing():
     from models.plan import PlanStep
 
     event_bus = EventBus()
@@ -778,15 +778,59 @@ def test_agent_interprets_tool_result_before_completing():
     importlib.reload(tools)
 
     decisions = [
-        AgentDecision(
-            action=AgentAction.PLAN,
-        ),
+        AgentDecision(action=AgentAction.PLAN),
         AgentDecision(
             action=AgentAction.COMPLETE,
             result={
-                "answer": "Carry a raincoat because precipitation probability is 56%."
+                "answer": (
+                    "Carry a raincoat because precipitation "
+                    "probability is 56%."
+                )
             },
         ),
+    ]
+
+    geocoding_response = {
+        "results": [
+            {
+                "name": "Mumbai",
+                "country": "India",
+                "latitude": 19.07283,
+                "longitude": 72.88261,
+            }
+        ]
+    }
+
+    forecast_response = {
+        "timezone": "Asia/Kolkata",
+        "current": {
+            "temperature_2m": 33.2,
+            "weather_code": 0,
+            "precipitation": 0,
+            "rain": 0,
+        },
+        "hourly": {
+            "time": [
+                "2026-10-06T12:00",
+                "2026-10-06T13:00",
+            ],
+            "precipitation_probability": [10, 56],
+        },
+    }
+
+    class FakeResponse:
+        def __init__(self, data):
+            self._data = data
+
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return self._data
+
+    responses = [
+        FakeResponse(geocoding_response),
+        FakeResponse(forecast_response),
     ]
 
     planned_step = PlanStep(
@@ -808,39 +852,57 @@ def test_agent_interprets_tool_result_before_completing():
         captured_context.append(decision_context)
         return decisions.pop(0)
 
-    with (
-        patch(
-            "agents.runtime.AgentRuntime.decide_task",
-            new=fake_decide_task,
-        ),
-        patch(
-            "agents.runtime.AgentRuntime.plan_task",
-            return_value=[planned_step],
-        ),
-    ):
+    try:
+        with (
+            patch(
+                "agents.runtime.AgentRuntime.decide_task",
+                new=fake_decide_task,
+            ),
+            patch(
+                "agents.runtime.AgentRuntime.plan_task",
+                return_value=[planned_step],
+            ),
+            patch("tools.weather.httpx.Client") as mock_client,
+            patch(
+                "langchain_core.language_models.BaseChatModel.invoke",
+            ) as mock_llm,
+        ):
+            client = mock_client.return_value.__enter__.return_value
+            client.get.side_effect = responses
 
-        state = {
-            "workflow_id": "agent-tool-result-test",
-            "messages": [
-                HumanMessage(
-                    content="Should I carry a raincoat in Mumbai today?"
-                )
-            ],
-            "agent_tasks": {},
-            "agent_messages": [],
-            "current_agent_task_id": None,
-            "steps": [],
-            "tool_results": {},
-            "execution_records": [],
-            "context": {},
-            "output": {},
-            "runtime_config": RuntimeConfig(),
-            "event_bus": event_bus,
-            "error": None,
-            "done": False,
-        }
+            mock_llm.return_value.content = (
+                "Carry a raincoat because precipitation "
+                "probability is 56%."
+            )
 
-        result = app.invoke(state)
+            state = {
+                "workflow_id": "agent-tool-result-test",
+                "messages": [
+                    HumanMessage(
+                        content=(
+                            "Should I carry a raincoat "
+                            "in Mumbai today?"
+                        )
+                    )
+                ],
+                "agent_tasks": {},
+                "agent_messages": [],
+                "current_agent_task_id": None,
+                "steps": [],
+                "tool_results": {},
+                "execution_records": [],
+                "context": {},
+                "output": {},
+                "runtime_config": RuntimeConfig(),
+                "event_bus": event_bus,
+                "error": None,
+                "done": False,
+            }
+
+            result = app.invoke(state)
+
+    finally:
+        clear_tool_registry()
 
     assert result["error"] is None
 

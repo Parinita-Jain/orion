@@ -130,3 +130,33 @@ def test_workflow_stream_emits_sse_events(mock_invoke):
     assert '"type": "workflow_started"' in response.text
     assert '"payload":' in response.text
     mock_invoke.assert_called_once()
+
+
+@patch("api.main.workflow_app.invoke")
+def test_execute_workflow_returns_error_when_workflow_handles_failure(mock_invoke):
+    from errors import OrionError, ErrorType
+    from langchain_core.messages import AIMessage
+
+    mock_invoke.return_value = {
+        "messages": [
+            AIMessage(
+                content="The AI service is temporarily unavailable. "
+                        "Please try again in a few minutes."
+            )
+        ],
+        "error": OrionError(
+            source="planner",
+            error_type=ErrorType.INFRASTRUCTURE,
+            message="Gemini quota exceeded",
+            recoverable=True,
+        ),
+        "done": True,
+    }
+
+    response = client.post(
+        "/workflow",
+        json={"question": "Explain RAG"},
+    )
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Workflow execution failed."
