@@ -16,6 +16,8 @@ from runtime.metrics_listener import MetricsListener
 from runtime.audit_listener import AuditListener
 from runtime.stream import stream_workflow
 
+from shared import llm_usage_tracker
+
 
 app = FastAPI(
     title="Orion API",
@@ -71,6 +73,9 @@ def create_workflow_state(question: str) -> tuple[str, dict]:
 def health_check():
     return {"status": "ok"}
 
+@app.get("/llm-usage")
+def get_llm_usage():
+    return llm_usage_tracker.snapshot()
 
 @app.post("/workflow", response_model=WorkflowResponse)
 def execute_workflow(request: WorkflowRequest):

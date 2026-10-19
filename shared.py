@@ -1,9 +1,12 @@
+
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_chroma import Chroma
-
 from langchain_google_genai import ChatGoogleGenerativeAI
-import os
 from dotenv import load_dotenv
+
+from runtime.llm_usage import LLMUsageTracker
+
+import os
 
 load_dotenv()
 
@@ -16,7 +19,10 @@ vectorstore = Chroma(
     embedding_function=embedding_model
 )
 
+llm_usage_tracker = LLMUsageTracker()
+
 llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
-    google_api_key=os.getenv("GOOGLE_API_KEY")
+    google_api_key=os.getenv("GOOGLE_API_KEY"),
+    callbacks=[llm_usage_tracker],
 )
