@@ -23,3 +23,11 @@ def test_non_google_exception_is_not_classified_as_quota():
     error = RuntimeError("429 quota exhausted")
 
     assert is_quota_or_rate_limit_error(error) is False
+
+
+def test_wrapped_quota_error_is_detected():
+    original_error = APIError(429, {"message": "Resource exhausted"})
+    wrapped_error = RuntimeError("Model invocation failed")
+    wrapped_error.__cause__ = original_error
+
+    assert is_quota_or_rate_limit_error(wrapped_error) is True

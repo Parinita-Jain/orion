@@ -5,6 +5,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from dotenv import load_dotenv
 
 from runtime.llm_usage import LLMUsageTracker
+from runtime.llm_fallback import QuotaAwareLLM
 
 import os
 
@@ -21,8 +22,24 @@ vectorstore = Chroma(
 
 llm_usage_tracker = LLMUsageTracker()
 
-llm = ChatGoogleGenerativeAI(
+primary_llm = ChatGoogleGenerativeAI(
     model="gemini-2.5-flash",
     google_api_key=os.getenv("GOOGLE_API_KEY"),
     callbacks=[llm_usage_tracker],
+)
+
+fallback_model_name = os.getenv("GEMINI_FALLBACK_MODEL")
+fallback_llm = (
+    ChatGoogleGenerativeAI(
+        model=fallback_model_name,
+        google_api_key=os.getenv("GOOGLE_API_KEY"),
+        callbacks=[llm_usage_tracker],
+    )
+    if fallback_model_name
+    else None
+)
+
+llm = QuotaAwareLLM(
+    primary=primary_llm,
+    fallback=fallback_llm,
 )
