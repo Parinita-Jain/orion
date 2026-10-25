@@ -1,0 +1,41 @@
+
+# Git history and configuration
+.git/
+.github/
+
+# Python virtual environments
+venv/
+.venv/
+env/
+
+# Python caches and test artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Secrets and local environment files
+.env
+.env.*
+!.env.example
+
+# Local databases and generated data
+chroma_db/
+data/workflows/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
