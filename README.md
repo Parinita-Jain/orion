@@ -1,6 +1,6 @@
 [![Orion Tests](https://github.com/Parinita-Jain/orion/actions/workflows/tests.yml/badge.svg)](https://github.com/Parinita-Jain/orion/actions/workflows/tests.yml)
 
-# Orion — AI Workflow Orchestration Framework
+# Orion â€” AI Workflow Orchestration Framework
 
 **Orion** is a modular AI workflow orchestration framework built on **LangGraph**.
 
@@ -63,27 +63,27 @@ The tool registry makes it easy to add new tools without modifying the planner.
 
 ```
                     START
-                      │
-                      ▼
+                      â”‚
+                      â–¼
                   Agent Node
-                      │
-                      ▼
+                      â”‚
+                      â–¼
                  Planner Node
-                      │
-            ┌─────────┴─────────┐
-            │                   │
-            ▼                   ▼
+                      â”‚
+            â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+            â”‚                   â”‚
+            â–¼                   â–¼
       Error Handler        Executor
-                                 │
-                                 ▼
+                                 â”‚
+                                 â–¼
                          Completion Node
-                                 │
-          ┌──────────────┬───────────────┬──────────────┐
-          │              │               │              │
-          ▼              ▼               ▼              ▼
+                                 â”‚
+          â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+          â”‚              â”‚               â”‚              â”‚
+          â–¼              â–¼               â–¼              â–¼
      Executor       Replanner     Synthesizer    Error Handler
-                                            │
-                                            ▼
+                                            â”‚
+                                            â–¼
                                            END
 ```
 
@@ -94,28 +94,28 @@ The tool registry makes it easy to add new tools without modifying the planner.
 ```
 orion/
 
-├── app.py
-├── graph.py
-├── state.py
-├── planner.py
-├── executor.py
-├── completion.py
-├── replanner.py
-├── synthesizer.py
-├── error_handler.py
-│
-├── config/
-├── docs/
-├── runtime/
-├── shared_types/
-├── tools/
-├── tests/
-│
-├── registry.py
-├── validator.py
-├── schemas.py
-├── requirements.txt
-└── README.md
+â”œâ”€â”€ app.py
+â”œâ”€â”€ graph.py
+â”œâ”€â”€ state.py
+â”œâ”€â”€ planner.py
+â”œâ”€â”€ executor.py
+â”œâ”€â”€ completion.py
+â”œâ”€â”€ replanner.py
+â”œâ”€â”€ synthesizer.py
+â”œâ”€â”€ error_handler.py
+â”‚
+â”œâ”€â”€ config/
+â”œâ”€â”€ docs/
+â”œâ”€â”€ runtime/
+â”œâ”€â”€ shared_types/
+â”œâ”€â”€ tools/
+â”œâ”€â”€ tests/
+â”‚
+â”œâ”€â”€ registry.py
+â”œâ”€â”€ validator.py
+â”œâ”€â”€ schemas.py
+â”œâ”€â”€ requirements.txt
+â””â”€â”€ README.md
 ```
 
 ---
@@ -124,22 +124,22 @@ orion/
 
 ```
 User Request
-      │
-      ▼
+      â”‚
+      â–¼
  Planner
-      │
-      ▼
+      â”‚
+      â–¼
  Executor
-      │
-      ▼
+      â”‚
+      â–¼
  Completion
-      │
- ┌────┼───────────────┬───────────────┐
- │    │               │               │
- ▼    ▼               ▼               ▼
+      â”‚
+ â”Œâ”€â”€â”€â”€â”¼â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+ â”‚    â”‚               â”‚               â”‚
+ â–¼    â–¼               â–¼               â–¼
 CONTINUE          REPLAN          COMPLETE      FAILED
- │                 │                 │            │
- ▼                 ▼                 ▼            ▼
+ â”‚                 â”‚                 â”‚            â”‚
+ â–¼                 â–¼                 â–¼            â–¼
 Executor      Replanner      Synthesizer   Error Handler
 ```
 
@@ -214,7 +214,7 @@ pytest
 Current status:
 
 ```
-95 tests passing
+265 tests passed, 1 warning (last verified locally on October 22, 2026)
 ```
 
 ---
@@ -231,18 +231,20 @@ Current status:
 - Completion state evaluation
 - Dynamic replanning
 - Structured error handling
+- SSE workflow event streaming
+- Dockerized local API deployment
+- Persistent ChromaDB storage using a Docker volume
+- Health and LLM usage endpoints
+- Quota-aware LLM fallback
 
 ## Planned
 
 - Step supersession for failed workflow steps
 - Parallel execution
-- Persistent workflow execution
+- Persistent workflow execution and recovery
 - Workflow visualization
 - Multi-agent collaboration
-- FastAPI deployment
-- Streaming execution
-- Docker support
-
+- Production/cloud deployment
 ---
 
 # Running Orion
@@ -254,3 +256,80 @@ python ingest.py
 
 python app.py
 ```
+---
+
+# Running Orion with Docker
+
+## Prerequisites
+
+- Docker Desktop with the Docker engine running.
+- A valid Google API key configured in a local `.env` file.
+
+## Build the image
+
+From the project root:
+
+```powershell
+docker build -t orion:0.2 .
+```
+
+## Start the container
+
+Create the persistent ChromaDB volume if it does not already exist:
+
+```powershell
+docker volume create orion_chroma
+```
+
+Start Orion:
+
+```powershell
+docker run -d --name orion-api -p 8000:8000 --env-file .env -v orion_chroma:/app/chroma_db --restart unless-stopped orion:0.2
+```
+
+The container reads runtime environment variables from `.env`. Keep this file out of version control and never include real credentials in the Docker image.
+
+The named volume `orion_chroma` stores ChromaDB data outside the container, so removing or recreating the container does not automatically delete the volume.
+
+## Verify the API
+
+Check container status:
+
+```powershell
+docker ps --filter "name=orion-api"
+```
+
+Check application health:
+
+```powershell
+Invoke-RestMethod http://localhost:8000/health
+```
+
+Inspect LLM usage without making a model request:
+
+```powershell
+Invoke-RestMethod http://localhost:8000/llm-usage
+```
+
+Inspect logs if the container fails to start:
+
+```powershell
+docker logs --tail 50 orion-api
+```
+
+## Stop and recreate the container
+
+Stop and remove the container:
+
+```powershell
+docker rm -f orion-api
+```
+
+Then run the `docker run` command above again. Do not remove the `orion_chroma` volume if you want to preserve the vector database.
+
+## Important notes
+
+- The Docker image build installs dependencies from `requirements.txt`. Most dependencies are not pinned, so future builds may resolve different versions.
+- The Hugging Face embedding model may need to download model files at startup.
+- Successful health checks do not prove that live Gemini requests or SSE workflow streaming work end to end.
+- Live model requests may fail if the provider quota is exhausted.
