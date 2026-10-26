@@ -1,165 +1,94 @@
-# Sprint 19 --- Dockerization
+# Sprint 19 — Dockerization and Reproducible Local Deployment
 
 ## Objective
 
-Containerize the Orion FastAPI application so it can be built and run in
-a reproducible Linux environment using Docker Desktop and the WSL 2
-backend.
+Containerize the Orion FastAPI application for reproducible local deployment while keeping secrets and persistent ChromaDB data outside the image.
 
 ## Environment
 
--   Host OS: Windows 11 Pro
--   Container runtime: Docker Desktop with WSL 2
--   Docker version: 29.8.2
--   Python base image: `python:3.11-slim`
--   Project branch at start: `main`
--   Starting commit: `11d56d6` --- `Add SSE workflow streaming endpoint`
+- Python base image: `python:3.11-slim`
+- Docker image: `orion:0.2`
+- Container name: `orion-api`
+- Published port: `8000`
+- ChromaDB named volume: `orion_chroma`
+- Volume mount: `/app/chroma_db`
+- Branch: `main`
+- Latest related commit: `00dc924`
 
-## Work completed
+## Work Completed
 
-### 1. Docker development environment
+### 1. Docker configuration
 
--   Installed and verified WSL 2 with Ubuntu.
--   Installed Docker Desktop.
--   Confirmed that `docker info` returned Docker Server information and
-    that the Docker engine was reachable.
+- Added a root-level `Dockerfile`.
+- Installed application dependencies from `requirements.txt`.
+- Configured Uvicorn to listen on `0.0.0.0:8000`.
+- Added `.dockerignore` to exclude secrets, Git metadata, virtual environments, caches, local ChromaDB data, and build artifacts.
+- Built image `orion:0.2` successfully on the home laptop.
 
-### 2. Docker configuration
+### 2. Runtime configuration and persistence
 
-Added a root-level `Dockerfile`:
+- Started container `orion-api` with port 8000 published.
+- Supplied runtime configuration through `.env`.
+- Mounted named volume `orion_chroma` at `/app/chroma_db`.
+- Confirmed the volume mount through Docker configuration inspection.
+- Replaced the exposed Google API key after it appeared in terminal output. Never print or commit secret values.
 
--   Uses `python:3.11-slim`.
--   Sets `/app` as the working directory.
--   Installs dependencies from `requirements.txt` inside the image.
--   Copies the Orion source into the image.
--   Exposes port `8000`.
--   Starts FastAPI with
-    `uvicorn api.main:app --host 0.0.0.0 --port 8000`.
+The volume mount is verified, but survival of actual ChromaDB data across container recreation has not been demonstrated.
 
-Added a root-level `.dockerignore` to exclude local secrets, Git
-metadata, virtual environments, caches, local ChromaDB data, generated
-workflow state, build artifacts, IDE files, and logs from the Docker
-build context.
+### 3. API verification
 
-The existing `.gitignore` was inspected and left unchanged.
+- `GET /health` returned `status: ok`.
+- `GET /llm-usage` returned HTTP 200 with empty usage totals immediately after startup.
+- OpenAPI inspection confirmed the routes:
+  - `GET /health`
+  - `GET /llm-usage`
+  - `POST /workflow`
+  - `POST /workflow/stream`
 
-### 3. Image build
+### 4. Automated tests
 
-Built the image successfully with:
+- Full regression suite: 265 passed, 1 warning in the previously recorded run.
+- Focused API and stream tests: 13 passed, 1 deprecation warning.
+- The streaming API test uses mocked workflow execution. These tests do not establish successful live Gemini-backed SSE execution inside Docker.
 
-``` powershell
-docker build -t orion:0.1 .
-```
+### 5. Documentation and delivery
 
-The build completed successfully, including dependency installation and
-source copy. The image was tagged `orion:0.1`.
+- Updated `README.md` with Docker build, run, verification, and volume instructions.
+- Committed Docker configuration and Sprint 19 documentation.
+- Pushed the README update in commit `00dc924`.
+- Synchronized the office laptop with `origin/main`.
 
-## API endpoints intended to be served
+## Acceptance Criteria
 
-The existing FastAPI application in `api/main.py` defines:
+- [x] Dockerfile builds the Orion image.
+- [x] Docker configuration starts Uvicorn on port 8000.
+- [x] `.dockerignore` excludes environment files, virtual environments, caches, and local ChromaDB data.
+- [x] Container starts successfully on the home laptop.
+- [x] `GET /health` succeeds from the running container.
+- [x] `GET /llm-usage` responds without a live model request.
+- [x] Runtime secrets are supplied outside the image.
+- [x] README contains local Docker instructions.
+- [x] Docker configuration and documentation are committed and pushed.
+- [x] Focused API and streaming tests pass.
+- [ ] Demonstrate that actual ChromaDB data survives container recreation.
+- [ ] Verify live Gemini-backed SSE execution in Docker when provider quota permits.
 
--   `GET /health`
--   `POST /workflow`
--   `POST /workflow/stream` (Server-Sent Events)
+## Known Limitations and Risks
 
-The application code and endpoint definitions were not changed as part
-of the initial Docker configuration.
+- Most dependencies in `requirements.txt` are not pinned, so subsequent builds may resolve different versions.
+- The container currently uses the base image's default user. Non-root execution should be considered before production deployment.
+- Hugging Face model download and cache behavior may depend on network access and local cache state.
+- Client disconnect cancellation and background-thread lifecycle limitations remain relevant to SSE workflow reliability.
+- Authentication, TLS, production hosting, and cloud deployment are outside this sprint.
 
-## Validation status
+## Remaining Work
 
-  -----------------------------------------------------------------------
-  Check                               Status
-  ----------------------------------- -----------------------------------
-  Docker Desktop engine reachable     Passed
+1. Verify ChromaDB data persistence across container recreation when safe test data is available.
+2. Verify live SSE execution without exposing secrets, when provider quota permits.
+3. Consider dependency pinning and non-root execution as separate hardening work.
 
-  Docker image build                  Passed
+## Conclusion
 
-  Container starts successfully       Not yet verified
+Sprint 19 delivered a working local Docker deployment, basic API health verification, runtime secret configuration, named-volume mounting, and updated documentation.
 
-  `GET /health` from the running      Not yet verified
-  container
-
-  `POST /workflow` from the running   Not yet verified
-  container
-
-  `POST /workflow/stream` from the    Not yet verified
-  running container
-
-  Runtime Google API key              Not yet verified
-  configuration
-
-  ChromaDB persistence using a Docker Not yet configured or verified
-  volume
-  -----------------------------------------------------------------------
-
-## Next steps
-
-1.  Start the container and inspect its status:
-
-    ``` powershell
-    docker run -d --name orion-api -p 8000:8000 orion:0.1
-    docker ps -a
-    ```
-
-2.  If it exits or fails to start, inspect the logs:
-
-    ``` powershell
-    docker logs orion-api
-    ```
-
-3.  Test the health endpoint after confirming the container is running:
-
-    ``` powershell
-    Invoke-RestMethod http://localhost:8000/health
-    ```
-
-4.  Configure `GOOGLE_API_KEY` securely at runtime, without putting the
-    key in the Dockerfile or committing it to Git.
-
-5.  Decide and test how ChromaDB data will persist across container
-    recreation. The local `chroma_db/` directory is excluded from the
-    image build context.
-
-6.  Test both workflow endpoints, including SSE streaming.
-
-7.  Run the existing automated test suite in an appropriate environment.
-
-8.  Review the dependency pinning strategy separately; most dependencies
-    in `requirements.txt` are currently unpinned. Do not change versions
-    without testing.
-
-## Screenshots / evidence
-
-Recommended evidence to capture as validation progresses:
-
-1.  **Docker image build success** --- terminal showing
-    `docker build -t orion:0.1 .` completed and the image was tagged.
-2.  **Container running** --- Docker Desktop Containers view or
-    `docker ps` showing `orion-api` running.
-3.  **Health endpoint response** --- PowerShell or browser showing the
-    response from `http://localhost:8000/health`.
-4.  **SSE endpoint test** --- a successful request to `/workflow/stream`
-    showing named workflow events, with secrets and sensitive output
-    redacted.
-
-The first item is available from the completed build. The remaining
-screenshots should only be added after those checks pass.
-
-## Notes and limitations
-
--   The Docker image build succeeded, but a successful image build does
-    not prove that the application starts or that all endpoints work
-    inside the container.
--   The Google API key has not yet been passed to the container.
--   Hugging Face embedding-model download/cache behavior has not yet
-    been verified inside the container.
--   ChromaDB persistence has not yet been configured or verified.
--   No application source files were intentionally modified for this
-    initial Docker setup.
-
-## Completion criteria
-
-Sprint 19 should be marked fully validated only after the container
-starts, `/health` responds successfully, runtime secrets are supplied
-safely, and the synchronous and SSE workflow endpoints have been tested.
-ChromaDB persistence behavior should also be documented and tested.
+Local deployment is validated. End-to-end live SSE behavior and actual data survival across container recreation remain explicitly unverified.
