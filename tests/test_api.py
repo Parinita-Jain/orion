@@ -179,3 +179,44 @@ def test_workflow_stream_reports_generic_error(mock_invoke):
     assert '"detail":"Workflow execution failed."' in response.text
     assert "Internal provider details must not be exposed" not in response.text
     mock_invoke.assert_called_once()
+
+
+@patch("api.main.stream_workflow")
+def test_workflow_stream_closes_stream_when_generator_closes(
+    mock_stream_workflow,
+):
+    import asyncio
+
+    from runtime.event import WorkflowEvent
+    from shared_types.workflow_event_type import WorkflowEventType
+    from api.main import stream_workflow_endpoint, WorkflowRequest
+
+    class FakeStream:
+        error = None
+
+        def __init__(self):
+            self.closed = False
+
+        def __iter__(self):
+            yield WorkflowEvent(
+                type=WorkflowEventType.WORKFLOW_STARTED,
+            )
+
+        def close(self):
+            self.closed = True
+
+    fake_stream = FakeStream()
+    mock_stream_workflow.return_value = fake_stream
+
+    response = stream_workflow_endpoint(
+        WorkflowRequest(question="Test cleanup")
+    )
+
+    async def consume_and_close():
+        generator = response.body_iterator
+        await generator.__anext__()
+        await generator.aclose()
+
+    asyncio.run(consume_and_close())
+
+    assert fake_stream.closed is True

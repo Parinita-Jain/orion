@@ -123,28 +123,31 @@ def stream_workflow_endpoint(request: WorkflowRequest):
     stream = stream_workflow(state, event_bus=state["event_bus"])
 
     def generate_events():
-        for event in stream:
-            event_name = event.type.value
-            event_data = {
-                "type": event_name,
-                "timestamp": event.timestamp,
-                "step_id": event.step_id,
-                "tool": event.tool,
-                "payload": event.payload,
-                "agent_task_id": event.agent_task_id,
-                "agent_id": event.agent_id,
-            }
+        try:
+            for event in stream:
+                event_name = event.type.value
+                event_data = {
+                    "type": event_name,
+                    "timestamp": event.timestamp,
+                    "step_id": event.step_id,
+                    "tool": event.tool,
+                    "payload": event.payload,
+                    "agent_task_id": event.agent_task_id,
+                    "agent_id": event.agent_id,
+                }
 
-            yield (
-                f"event: {event_name}\n"
-                f"data: {json.dumps(event_data, default=str)}\n\n"
-            )
+                yield (
+                    f"event: {event_name}\n"
+                    f"data: {json.dumps(event_data, default=str)}\n\n"
+                )
 
-        if stream.error is not None:
-            yield (
-                "event: error\n"
-                'data: {"detail":"Workflow execution failed."}\n\n'
-            )
+            if stream.error is not None:
+                yield (
+                    "event: error\n"
+                    'data: {"detail":"Workflow execution failed."}\n\n'
+                )
+        finally:
+            stream.close()
 
     return StreamingResponse(
         generate_events(),

@@ -110,6 +110,32 @@ Improve the reliability and resource lifecycle of Orion workflow execution and S
 - Full regression test results.
 - Reviewed and pushed code and sprint documentation.
 
+## Implementation Notes
+
+### Implemented
+
+- Added `EventBus.unsubscribe()` to remove a specific listener safely without affecting other subscribers.
+- Updated `WorkflowStream` to unsubscribe its event listener when workflow execution completes or fails.
+- Added `WorkflowStream.close()` so consumers can stop receiving events without forcibly terminating the workflow thread.
+- Updated the SSE response generator to call `stream.close()` in a `finally` block, including when the response generator is closed early.
+- Preserved generic client-facing workflow error reporting so internal exception details are not exposed.
+- Added API coverage verifying that closing the SSE response generator closes the underlying stream.
+- Retained tests for workflow errors, listener cleanup, and concurrent stream isolation.
+
+### Remaining Limitations
+
+- Explicit HTTP client-disconnect detection has not been separately implemented and verified.
+- Closing a stream detaches its listener; it does not cancel or terminate the background workflow thread.
+- Cooperative workflow cancellation has not been implemented.
+- Live Gemini-backed SSE behavior in Docker remains unverified.
+- Not all Sprint 20 acceptance criteria are complete.
+
+## Verification Results
+
+- Focused API, workflow-stream, and EventBus tests: 20 passed.
+- Full regression suite: 269 passed.
+- `git diff --check`: passed with no reported whitespace errors.
+
 ## Status
 
-Planned. No Sprint 20 implementation or test results are claimed by this document.
+Partially implemented. Stream listener cleanup, SSE generator cleanup, generic workflow error reporting, and regression tests are in place. Client-disconnect detection and cooperative cancellation remain outstanding.
