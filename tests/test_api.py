@@ -160,3 +160,22 @@ def test_execute_workflow_returns_error_when_workflow_handles_failure(mock_invok
 
     assert response.status_code == 500
     assert response.json()["detail"] == "Workflow execution failed."
+
+
+@patch("runtime.stream.app.invoke")
+def test_workflow_stream_reports_generic_error(mock_invoke):
+    mock_invoke.side_effect = RuntimeError(
+        "Internal provider details must not be exposed"
+    )
+
+    response = client.post(
+        "/workflow/stream",
+        json={"question": "Test streaming failure"},
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert "event: error" in response.text
+    assert '"detail":"Workflow execution failed."' in response.text
+    assert "Internal provider details must not be exposed" not in response.text
+    mock_invoke.assert_called_once()

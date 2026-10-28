@@ -66,3 +66,23 @@ def test_timestamp_added():
     bus.emit(event)
 
     assert received[0].timestamp > 0
+
+
+def test_unsubscribe_removes_only_the_selected_listener():
+    first = []
+    second = []
+
+    bus = EventBus()
+    bus.subscribe(first.append)
+    bus.subscribe(second.append)
+
+    bus.unsubscribe(first.append)
+
+    event = WorkflowEvent(
+        type=WorkflowEventType.WORKFLOW_STARTED,
+    )
+    bus.emit(event)
+
+    assert first == []
+    assert len(second) == 1
+    assert second[0].type == WorkflowEventType.WORKFLOW_STARTED

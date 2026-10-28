@@ -211,3 +211,53 @@ def test_stream_event_bus_isolation():
 
     assert stream_a.result["workflow_id"] == "stream-isolation-a"
     assert stream_b.result["workflow_id"] == "stream-isolation-b"
+
+
+def test_workflow_stream_unsubscribes_listener_after_completion(monkeypatch):
+    from runtime.stream import WorkflowStream
+
+    event_bus = EventBus()
+
+    def fake_invoke(state):
+        return {"status": "completed"}
+
+    monkeypatch.setattr("runtime.stream.app.invoke", fake_invoke)
+
+    stream = WorkflowStream({}, event_bus=event_bus)
+
+    # Drain the stream so execution reaches its terminal sentinel.
+    list(stream)
+
+    assert stream.done
+    assert stream._listener not in event_bus._listeners
+
+
+def test_workflow_stream_close_unsubscribes_listener(monkeypatch):
+    from threading import Event
+
+    from runtime.event_bus import EventBus
+    from runtime.stream import WorkflowStream
+
+    event_bus = EventBus()
+    execution_started = Event()
+    allow_execution_to_finish = Event()
+
+    def fake_invoke(state):
+        execution_started.set()
+        allow_execution_to_finish.wait(timeout=5)
+        return state
+
+    monkeypatch.setattr("runtime.stream.app.invoke", fake_invoke)
+
+    stream = WorkflowStream({}, event_bus=event_bus)
+
+    try:
+        assert execution_started.wait(timeout=2)
+
+        assert stream._listener in event_bus._listeners
+
+        stream.close()
+
+        assert stream._listener not in event_bus._listeners
+    finally:
+        allow_execution_to_finish.set()

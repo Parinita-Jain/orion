@@ -25,9 +25,10 @@ class WorkflowStream(Iterator[WorkflowEvent]):
         self._error: BaseException | None = None
 
         execution_state = dict(state)
-        event_bus = event_bus or EventBus()
-        event_bus.subscribe(self._queue.put)
-        execution_state["event_bus"] = event_bus
+        self._event_bus = event_bus if event_bus is not None else EventBus()
+        self._listener = self._queue.put
+        self._event_bus.subscribe(self._listener)
+        execution_state["event_bus"] = self._event_bus
 
         self._thread = Thread(
             target=self._run,
@@ -43,6 +44,7 @@ class WorkflowStream(Iterator[WorkflowEvent]):
         except BaseException as exc:
             self._error = exc
         finally:
+            self._event_bus.unsubscribe(self._listener)
             self._queue.put(_STREAM_END)
 
     def __iter__(self) -> WorkflowStream:
@@ -55,6 +57,11 @@ class WorkflowStream(Iterator[WorkflowEvent]):
             raise StopIteration
 
         return item
+
+    def close(self) -> None:
+        """Stop receiving events without forcibly terminating the workflow."""
+        if self._event_bus is not None and self._listener is not None:
+            self._event_bus.unsubscribe(self._listener)
 
     @property
     def result(self) -> dict[str, Any] | None:
@@ -83,6 +90,8 @@ class WorkflowStream(Iterator[WorkflowEvent]):
         stream._queue = Queue()
         stream._result = state
         stream._error = None
+        stream._event_bus = None
+        stream._listener = None
         stream._thread = None
 
         stream._queue.put(_STREAM_END)
