@@ -118,24 +118,31 @@ Improve the reliability and resource lifecycle of Orion workflow execution and S
 - Updated `WorkflowStream` to unsubscribe its event listener when workflow execution completes or fails.
 - Added `WorkflowStream.close()` so consumers can stop receiving events without forcibly terminating the workflow thread.
 - Updated the SSE response generator to call `stream.close()` in a `finally` block, including when the response generator is closed early.
+- Added `WorkflowStreamingResponse` to close the underlying workflow stream when the ASGI response finishes or exits due to a client disconnect.
 - Preserved generic client-facing workflow error reporting so internal exception details are not exposed.
-- Added API coverage verifying that closing the SSE response generator closes the underlying stream.
+- Added API tests for response-generator cleanup and client-disconnect cleanup.
 - Retained tests for workflow errors, listener cleanup, and concurrent stream isolation.
+
+### Disconnect Policy
+
+The current policy is to **close the client-facing stream and detach its event listener when the SSE response terminates or the client disconnects**. This prevents the disconnected client from continuing to consume events through that listener.
+
+Closing the stream does not terminate the underlying LangGraph execution thread. The workflow may continue running after the client disconnects. Cooperative cancellation is not implemented.
 
 ### Remaining Limitations
 
-- Explicit HTTP client-disconnect detection has not been separately implemented and verified.
-- Closing a stream detaches its listener; it does not cancel or terminate the background workflow thread.
+- Background workflow execution is not cancelled when a client disconnects.
 - Cooperative workflow cancellation has not been implemented.
 - Live Gemini-backed SSE behavior in Docker remains unverified.
+- Production behavior across all ASGI server and disconnect scenarios has not been exhaustively verified.
 - Not all Sprint 20 acceptance criteria are complete.
 
 ## Verification Results
 
-- Focused API, workflow-stream, and EventBus tests: 20 passed.
-- Full regression suite: 269 passed.
+- Focused API and workflow-stream tests: 17 passed after the final response-cleanup implementation.
+- Full regression suite: 270 passed.
 - `git diff --check`: passed with no reported whitespace errors.
 
 ## Status
 
-Partially implemented. Stream listener cleanup, SSE generator cleanup, generic workflow error reporting, and regression tests are in place. Client-disconnect detection and cooperative cancellation remain outstanding.
+Partially implemented. Workflow listener cleanup, SSE generator cleanup, response-level client-disconnect cleanup, generic workflow error reporting, and regression tests are in place. Client-facing disconnect cleanup is tested, but the underlying workflow is not cancelled. Cooperative cancellation and live Gemini-backed SSE verification remain outstanding.
