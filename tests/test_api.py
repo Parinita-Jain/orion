@@ -220,3 +220,63 @@ def test_workflow_stream_closes_stream_when_generator_closes(
     asyncio.run(consume_and_close())
 
     assert fake_stream.closed is True
+
+
+@patch("api.main.stream_workflow")
+def test_workflow_stream_closes_on_client_disconnect(mock_stream_workflow):
+    import asyncio
+
+    from api.main import WorkflowRequest, stream_workflow_endpoint
+    from runtime.event import WorkflowEvent
+    from shared_types.workflow_event_type import WorkflowEventType
+
+    class FakeStream:
+        error = None
+
+        def __init__(self):
+            self.closed = False
+
+        def __iter__(self):
+            yield WorkflowEvent(type=WorkflowEventType.WORKFLOW_STARTED)
+
+        def close(self):
+            self.closed = True
+
+    fake_stream = FakeStream()
+    mock_stream_workflow.return_value = fake_stream
+    response = stream_workflow_endpoint(
+        WorkflowRequest(question="Test disconnect")
+    )
+
+    async def run_disconnect():
+        messages = [
+            {"type": "http.request", "body": b"", "more_body": False},
+            {"type": "http.disconnect"},
+        ]
+
+        async def receive():
+            if messages:
+                return messages.pop(0)
+            await asyncio.sleep(10)
+
+        async def send(message):
+            pass
+
+        scope = {
+            "type": "http",
+            "asgi": {"version": "3.0", "spec_version": "2.3"},
+            "method": "POST",
+            "path": "/workflow/stream",
+            "headers": [],
+            "query_string": b"",
+            "server": ("testserver", 80),
+            "client": ("testclient", 12345),
+            "scheme": "http",
+            "http_version": "1.1",
+        }
+
+        await response(scope, receive, send)
+
+    asyncio.run(run_disconnect())
+
+    assert fake_stream.closed is True

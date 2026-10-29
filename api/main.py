@@ -35,6 +35,18 @@ class WorkflowResponse(BaseModel):
     answer: str
 
 
+class WorkflowStreamingResponse(StreamingResponse):
+    def __init__(self, *args, stream, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.workflow_stream = stream
+
+    async def __call__(self, scope, receive, send):
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            self.workflow_stream.close()
+
+
 def create_workflow_state(question: str) -> tuple[str, dict]:
     """Create an independent workflow state and its monitoring listeners."""
     workflow_id = str(uuid4())
@@ -149,8 +161,9 @@ def stream_workflow_endpoint(request: WorkflowRequest):
         finally:
             stream.close()
 
-    return StreamingResponse(
+    return WorkflowStreamingResponse(
         generate_events(),
+        stream=stream,
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
